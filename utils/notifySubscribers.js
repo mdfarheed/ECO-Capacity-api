@@ -37,7 +37,7 @@ exports.notifyNewBlog = async (blog) => {
               <hr style="margin: 20px 0;" />
              <p style="text-align: center; font-size: 13px; color: #888;">
   Don't want to receive these emails?
-  <a href="http://192.168.1.24:8000/api/unsubscribeToEmail?email=${encodeURIComponent(user.email)}" style="color: #FF5252;">Unsubscribe</a>
+  <a href="https://eco-capacity-api.onrender.com/api/unsubscribeToEmail?email=${encodeURIComponent(user.email)}" style="color: #FF5252;">Unsubscribe</a>
 </p>
 
             </div>
@@ -86,7 +86,7 @@ exports.notifyNewEvent = async (event) => {
               <hr style="margin: 20px 0;" />
               <p style="text-align: center; font-size: 13px; color: #888;">
   Don't want to receive these emails?
-  <a href="http://192.168.1.24:8000/api/unsubscribeToEmail?email=${encodeURIComponent(user.email)}" style="color: #FF5252;">Unsubscribe</a>
+  <a href="https://eco-capacity-api.onrender.com/api/unsubscribeToEmail?email=${encodeURIComponent(user.email)}" style="color: #FF5252;">Unsubscribe</a>
 </p>
 
             </div>
