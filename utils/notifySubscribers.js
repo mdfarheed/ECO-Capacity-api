@@ -33,7 +33,7 @@ exports.notifyNewBlog = async (blog) => {
               <p style="font-size: 14px; margin-top: 10px; color: #666;">By ${blog.author} on ${blog.date}</p>
               <h2 style="color: #333;">${blog.title}</h2>
               <p style="color: #555;">${truncate(blog.content2, 120)}</p>
-              <a href="https://yourfrontend.com/blogs/${blog.id}" style="display: inline-block; margin-top: 10px; padding: 10px 20px; background: #8A85C9; color: white; text-decoration: none; border-radius: 5px;">Read More</a>
+              <a href="https://eco-capacity-web.vercel.app/blogs/${blog.id}" style="display: inline-block; margin-top: 10px; padding: 10px 20px; background: #8A85C9; color: white; text-decoration: none; border-radius: 5px;">Read More</a>
               <hr style="margin: 20px 0;" />
              <p style="text-align: center; font-size: 13px; color: #888;">
   Don't want to receive these emails?
@@ -82,7 +82,7 @@ exports.notifyNewEvent = async (event) => {
               <p style="font-size: 14px; margin-top: 10px; color: #666;">📍 ${event.location} | 📅 ${event.date}</p>
               <h2 style="color: #333;">${event.title}</h2>
               <p style="color: #555;">${truncate(event.description, 100)}</p>
-              <a href="https://yourfrontend.com/event/${event.id}" style="display: inline-block; margin-top: 10px; padding: 10px 20px; background: #A48CF0; color: white; text-decoration: none; border-radius: 5px;">Book Now</a>
+              <a href="https://eco-capacity-web.vercel.app/event/${event.id}" style="display: inline-block; margin-top: 10px; padding: 10px 20px; background: #A48CF0; color: white; text-decoration: none; border-radius: 5px;">Book Now</a>
               <hr style="margin: 20px 0;" />
               <p style="text-align: center; font-size: 13px; color: #888;">
   Don't want to receive these emails?
