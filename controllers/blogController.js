@@ -1,5 +1,6 @@
 const Blog = require('../models/Blog');
 const { cloudinary } = require('../config/cloudinary');
+const { notifyNewBlog } = require('../utils/notifySubscribers');
 const Counter = require('../models/Counter');
 
 // @POST: Add blog
@@ -28,12 +29,14 @@ exports.addBlog = async (req, res) => {
       imagePublicId: req.file.filename,
     });
 
+    // Notify Subscribers once per subscriber per blog
+    await notifyNewBlog(blog);
+
     res.status(201).json({ message: 'Blog created ✅', blog });
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
-
 
 // @PUT: Update blog
 exports.updateBlog = async (req, res) => {

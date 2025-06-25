@@ -2,6 +2,7 @@ const Admin = require('../models/Admin');
 const OtpToken = require('../models/OtpToken');
 const generateToken = require('../utils/generateToken');
 const sendEmail = require('../utils/sendEmail');
+
 const { cloudinary } = require('../config/cloudinary');
 
 // 🔢 OTP generator

@@ -38,8 +38,9 @@ app.use('/api', require('./routes/sectionSixRoutes'));
 app.use('/api', require('./routes/sectionSevenRoutes'));
 app.use('/api', require('./routes/sectionNineRoutes'));
 app.use('/api/admin', adminRoutes);
+const subscribeRoutes = require('./routes/subscribeRoutes');
+app.use('/api', subscribeRoutes);
 
-    
 
 // SEO Routes
 app.use('/api/seo', seoRoutes);

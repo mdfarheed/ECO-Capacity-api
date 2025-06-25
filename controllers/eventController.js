@@ -1,5 +1,7 @@
 const Event = require('../models/Event');
 const Counter = require('../models/Counter');
+const {notifyNewEvent } = require('../utils/notifySubscribers');
+const NotificationLog = require('../models/NotificationLog');
 const { cloudinary } = require('../config/cloudinary');
 
 // @POST: Add Event
@@ -29,6 +31,9 @@ exports.addEvent = async (req, res) => {
       cardImageUrl: req.files['cardImage'][0].path,
       cardImagePublicId: req.files['cardImage'][0].filename,
     });
+
+    // Notify Subscribers once per subscriber per event
+    await notifyNewEvent(event);
 
     res.status(201).json({ message: 'Event created ✅', event });
   } catch (err) {
