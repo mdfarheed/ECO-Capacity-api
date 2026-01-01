@@ -117,3 +117,78 @@ exports.getMemberById = async (req, res) => {
     res.status(500).json({ message: "Server error", error: error.message });
   }
 };
+
+/**
+ * Bulk Add / Update Members via JSON
+ * Logic:
+ * - if _id exists -> update
+ * - if _id does not exist -> create
+ * - ignore profileImg completely
+ */
+/**
+ * Bulk Add / Update Members via JSON FILE
+ */
+exports.bulkUpsertMembers = async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        message: "JSON file is required"
+      });
+    }
+
+    // 🔹 Read JSON file buffer
+    const fileData = JSON.parse(req.file.buffer.toString("utf-8"));
+
+    const { members } = fileData;
+
+    if (!Array.isArray(members)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid JSON format: members array missing"
+      });
+    }
+
+    let created = 0;
+    let updated = 0;
+
+    for (const member of members) {
+      // ❌ Ignore unwanted fields
+      delete member.profileImg;
+      delete member.createdAt;
+      delete member.updatedAt;
+      delete member.__v;
+
+      if (member._id) {
+        const updatedMember = await Member.findByIdAndUpdate(
+          member._id,
+          member,
+          { new: true }
+        );
+
+        if (updatedMember) updated++;
+      } else {
+        await Member.create(member);
+        created++;
+      }
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Members JSON uploaded successfully ✅",
+      summary: {
+        total: members.length,
+        created,
+        updated
+      }
+    });
+
+  } catch (error) {
+    console.error("Bulk JSON upload error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Bulk JSON upload failed",
+      error: error.message
+    });
+  }
+};

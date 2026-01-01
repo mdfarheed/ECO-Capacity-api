@@ -1,12 +1,14 @@
 const express = require("express");
 const router = express.Router();
 const upload = require("../middleware/upload"); // multer setup
+const jsonUpload = require("../middleware/jsonUpload");
 const {
   addMember,
   updateMember,
   deleteMember,
   getAllMembers,
-  getMemberById
+  getMemberById,
+  bulkUpsertMembers
 } = require("../controllers/memberController");
 
 // Create Member
@@ -23,5 +25,12 @@ router.get("/", getAllMembers);
 
 // Get Member by ID
 router.get("/:id", getMemberById);
+
+// 🔥 BULK JSON FILE API
+router.post(
+  "/bulk/json",
+  jsonUpload.single("file"), // 👈 frontend se "file" key
+  bulkUpsertMembers
+);
 
 module.exports = router;
