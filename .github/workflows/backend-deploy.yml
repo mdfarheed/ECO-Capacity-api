@@ -2,8 +2,8 @@ name: Deploy Backend
 
 on:
   push:
-    paths:
-      - 'backend/**'
+    branches:
+      - main  
 
 jobs:
   deploy:
@@ -16,10 +16,11 @@ jobs:
           username: ${{ secrets.USERNAME }}
           password: ${{ secrets.PASSWORD }}
           script: |
+            # Folder path fix
             cd /var/www/eco-capacity/backend
             git pull origin main
             
-            # Creating the .env file dynamically from GitHub Secrets
+            # Creating .env
             echo "PORT=${{ secrets.PORT }}" > .env
             echo "MONGO_URI=${{ secrets.MONGO_URI }}" >> .env
             echo "JWT_SECRET=${{ secrets.JWT_SECRET }}" >> .env
@@ -31,5 +32,6 @@ jobs:
             echo "GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }}" >> .env
 
             npm install
-            # Restart backend using PM2
+            
+            # Restart backend
             pm2 restart eco-backend || pm2 start server.js --name "eco-backend"
