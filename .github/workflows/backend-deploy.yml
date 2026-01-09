@@ -16,7 +16,7 @@ jobs:
           username: ${{ secrets.USERNAME }}
           password: ${{ secrets.PASSWORD }}
           script: |
-            cd /var/www/laundry-app/backend
+            cd /var/www/eco-capacity/backend
             git pull origin main
             
             # Creating the .env file dynamically from GitHub Secrets
