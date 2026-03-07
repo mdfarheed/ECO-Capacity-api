@@ -14,7 +14,7 @@ const upload = require('../middleware/upload');
 const router = express.Router();
 
 router.post('/login', loginAdmin);
-router.get('/profile', protect, getAdminProfile);
+router.get('/profile', getAdminProfile);
 router.put('/profile', protect, upload.single('profileImage'), updateAdminProfile);
 router.put('/update-password', protect, updatePassword);
 router.post('/reset-password/send-otp', sendResetOtp);
