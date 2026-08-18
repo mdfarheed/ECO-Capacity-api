@@ -5,7 +5,7 @@ const Counter = require('../models/Counter');
 
 // @POST: Add blog
 exports.addBlog = async (req, res) => {
-  const { title, title2, author, date, content1, content2, catagory } = req.body; // ✅ catagory included
+  const { title, title2, author, date, content1, content2, catagory } = req.body;
 
   try {
     let counter = await Counter.findOne({ name: 'blog_custom_id' });
@@ -19,17 +19,16 @@ exports.addBlog = async (req, res) => {
     const blog = await Blog.create({
       id: counter.value,
       title,
-      title2,
+      title2: title2 || "",          // 👈 optional
       author,
       date,
       content1,
       content2,
-      catagory, // ✅ include this
-      imageUrl: req.file.path,
-      imagePublicId: req.file.filename,
+      catagory,
+      imageUrl: req.file ? req.file.path : "",         // 👈 optional
+      imagePublicId: req.file ? req.file.filename : "", // 👈 optional
     });
 
-    // Notify Subscribers once per subscriber per blog
     await notifyNewBlog(blog);
 
     res.status(201).json({ message: 'Blog created ✅', blog });
@@ -48,18 +47,20 @@ exports.updateBlog = async (req, res) => {
     if (!blog) return res.status(404).json({ message: 'Blog not found' });
 
     if (req.file) {
-      await cloudinary.uploader.destroy(blog.imagePublicId);
+      if (blog.imagePublicId) {
+        await cloudinary.uploader.destroy(blog.imagePublicId);
+      }
       blog.imageUrl = req.file.path;
       blog.imagePublicId = req.file.filename;
     }
 
     blog.title = title;
-    blog.title2 = title2;
+    blog.title2 = title2 || ""; // 👈 optional
     blog.author = author;
     blog.date = date;
     blog.content1 = content1;
     blog.content2 = content2;
-    blog.catagory = catagory; // ✅ update catagory too
+    blog.catagory = catagory;
 
     await blog.save();
 

@@ -1,15 +1,15 @@
 const mongoose = require('mongoose');
 
 const blogSchema = new mongoose.Schema({
-  id: { type: Number, unique: true }, // 👈 custom id
+  id: { type: Number, unique: true },
   title: String,
-  title2: String,
+  title2: String, // optional — no required
   author: String,
   date: String,
   content1: String,
   content2: String,
-  catagory: String, // ✅ NEW field added
-  imageUrl: String,
+  catagory: String,
+  imageUrl: String, // optional — no required
   imagePublicId: String,
 });
 

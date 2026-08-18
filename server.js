@@ -26,20 +26,11 @@ app.use(cors({
 app.use('/api', require('./routes/authRoutes'));
 app.use('/api', require('./routes/contactRoutes'));
 app.use('/api', require('./routes/blogRoutes'));
-app.use('/api', require('./routes/eventRoutes'));
-app.use('/api', require('./routes/heroRoutes'));
-app.use('/api', require('./routes/heroRoutes'));
-app.use('/api', require('./routes/videoSectionRoutes'));
-app.use('/api', require('./routes/sectionOneRoutes'));
-app.use('/api', require('./routes/thirdSectionRoutes'));
-app.use('/api', require('./routes/sectionFourRoutes'));
-app.use('/api', require('./routes/sectionFifthRoutes'));
-app.use('/api', require('./routes/sectionEightRoute'));
-app.use('/api', require('./routes/sectionSixRoutes'));
-app.use('/api', require('./routes/sectionSevenRoutes'));
-app.use('/api', require('./routes/sectionNineRoutes'));
 app.use('/api/admin', adminRoutes);
 app.use("/api/members", memberRoutes);
+app.use('/api', require('./routes/articleRoutes'));
+app.use('/api', require('./routes/researchRoutes'));
+app.use('/api', require('./routes/faqRoutes'));
 const subscribeRoutes = require('./routes/subscribeRoutes');
 app.use('/api', subscribeRoutes);
 
