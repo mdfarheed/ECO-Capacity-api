@@ -11,7 +11,7 @@ deployment:
 
 
     # ==========================================
-    # COPY PROJECT FILES
+    # COPY FILES
     # ==========================================
     - /bin/cp -R controllers $DEPLOYPATH
     - /bin/cp -R middleware $DEPLOYPATH
@@ -24,31 +24,32 @@ deployment:
 
 
     # ==========================================
-    # VERIFY NODE + NPM
+    # NODE / NPM
     # ==========================================
     - node -v
     - npm -v
-
-
-    # ==========================================
-    # INSTALL DEPENDENCIES
-    # ==========================================
     - cd $DEPLOYPATH && npm install --omit=dev
 
 
     # ==========================================
-    # INSTALL PM2
+    # PM2
     # ==========================================
-    - npm install -g pm2
+    - $NODEPATH/npm install -g pm2
 
 
     # ==========================================
-    # RESTART BACKEND
+    # STOP OLD PM2 PROCESS
     # ==========================================
-    - cd $DEPLOYPATH && pm2 restart eco-backend || pm2 start server.js --name eco-backend
+    - $NODEPATH/pm2 delete eco-backend || true
+
+
+    # ==========================================
+    # START BACKEND
+    # ==========================================
+    - cd $DEPLOYPATH && $NODEPATH/pm2 start server.js --name eco-backend
 
 
     # ==========================================
     # SAVE PM2
     # ==========================================
-    - pm2 save
+    - $NODEPATH/pm2 save
