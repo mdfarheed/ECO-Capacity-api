@@ -7,6 +7,7 @@ deployment:
     # ==========================================
     - export DEPLOYPATH=/home/recipco1/repositories/ECO-Capacity-api/
     - export NODEPATH=/home/recipco1/.nvm/versions/node/v20.20.2/bin
+    - export PATH=$NODEPATH:$PATH
 
 
     # ==========================================
@@ -23,25 +24,31 @@ deployment:
 
 
     # ==========================================
+    # NODE + NPM CHECK
+    # ==========================================
+    - node -v
+    - npm -v
+
+
+    # ==========================================
     # INSTALL DEPENDENCIES
     # ==========================================
-    - cd $DEPLOYPATH && $NODEPATH/npm install --omit=dev
+    - cd $DEPLOYPATH && npm install --omit=dev
 
 
     # ==========================================
     # INSTALL PM2
     # ==========================================
-    - $NODEPATH/npm install -g pm2
+    - npm install -g pm2
 
 
     # ==========================================
     # RESTART BACKEND
     # ==========================================
-    - export PATH=$NODEPATH:$PATH
-    - cd $DEPLOYPATH && $NODEPATH/pm2 restart eco-backend || $NODEPATH/pm2 start server.js --name eco-backend
+    - cd $DEPLOYPATH && pm2 restart eco-backend || pm2 start server.js --name eco-backend
 
 
     # ==========================================
     # SAVE PM2
     # ==========================================
-    - $NODEPATH/pm2 save
+    - pm2 save
