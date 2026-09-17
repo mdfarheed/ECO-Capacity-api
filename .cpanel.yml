@@ -9,9 +9,8 @@ deployment:
     - export NODEPATH=/home/recipco1/.nvm/versions/node/v20.20.2/bin
     - export PATH=$NODEPATH:$PATH
 
-
     # ==========================================
-    # COPY FILES
+    # COPY PROJECT FILES
     # ==========================================
     - /bin/cp -R controllers $DEPLOYPATH
     - /bin/cp -R middleware $DEPLOYPATH
@@ -22,34 +21,38 @@ deployment:
     - /bin/cp package.json $DEPLOYPATH
     - /bin/cp package-lock.json $DEPLOYPATH
 
+    # ==========================================
+    # NODE CHECK
+    # ==========================================
+    - $NODEPATH/node -v
+    - $NODEPATH/npm -v
 
     # ==========================================
-    # NODE / NPM
+    # INSTALL DEPENDENCIES
     # ==========================================
-    - node -v
-    - npm -v
-    - cd $DEPLOYPATH && npm install --omit=dev
-
+    - cd $DEPLOYPATH && $NODEPATH/npm install --omit=dev
 
     # ==========================================
-    # PM2
+    # PM2 INSTALL / REFRESH
     # ==========================================
     - $NODEPATH/npm install -g pm2
 
+    # ==========================================
+    # STOP PM2 DAEMON
+    # ==========================================
+    - $NODEPATH/pm2 kill || true
 
     # ==========================================
-    # STOP OLD PM2 PROCESS
+    # START BACKEND WITH EXACT NODE
     # ==========================================
-    - $NODEPATH/pm2 delete eco-backend || true
-
-
-    # ==========================================
-    # START BACKEND
-    # ==========================================
-    - cd $DEPLOYPATH && $NODEPATH/pm2 start server.js --name eco-backend
-
+    - cd $DEPLOYPATH && $NODEPATH/pm2 start server.js --name eco-backend --interpreter $NODEPATH/node --update-env
 
     # ==========================================
     # SAVE PM2
     # ==========================================
     - $NODEPATH/pm2 save
+
+    # ==========================================
+    # VERIFY
+    # ==========================================
+    - $NODEPATH/pm2 list
