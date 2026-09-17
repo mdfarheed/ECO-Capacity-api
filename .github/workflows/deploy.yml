@@ -13,16 +13,24 @@ jobs:
       - name: Checkout GitHub repository
         uses: actions/checkout@v4
 
-      - name: Configure SSH
+      - name: Setup SSH Agent
+        uses: webfactory/ssh-agent@v0.9.1
+        with:
+          ssh-private-key: ${{ secrets.CPANEL_SSH_KEY }}
+
+      - name: Add cPanel host
         run: |
           mkdir -p ~/.ssh
-          echo "${{ secrets.CPANEL_SSH_KEY }}" > ~/.ssh/id_rsa
-          chmod 600 ~/.ssh/id_rsa
           ssh-keyscan -p 26398 recipco.com >> ~/.ssh/known_hosts
 
       - name: Test SSH Connection
         run: |
-          ssh -p 26398 recipco1@recipco.com "echo SSH_CONNECTION_SUCCESS"
+          ssh \
+            -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=yes \
+            -p 26398 \
+            recipco1@recipco.com \
+            "echo SSH_CONNECTION_SUCCESS"
 
       - name: Push to cPanel Git Repository
         run: |
@@ -31,6 +39,8 @@ jobs:
 
           git remote remove cpanel 2>/dev/null || true
 
-          git remote add cpanel ssh://recipco1@recipco.com:26398/home/recipco1/repositories/eco-capacity-git
+          git remote add cpanel \
+            ssh://recipco1@recipco.com:26398/home/recipco1/repositories/eco-capacity-git
 
+          GIT_SSH_COMMAND="ssh -o IdentitiesOnly=yes -p 26398" \
           git push cpanel HEAD:main --force
