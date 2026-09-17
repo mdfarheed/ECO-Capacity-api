@@ -18,7 +18,7 @@ jobs:
           mkdir -p ~/.ssh
           chmod 700 ~/.ssh
 
-          echo "${{ secrets.CPANEL_SSH_KEY }}" > ~/.ssh/id_rsa
+          printf '%s\n' '${{ secrets.CPANEL_SSH_KEY }}' > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
 
           ssh-keyscan -p 26398 recipco.com >> ~/.ssh/known_hosts
