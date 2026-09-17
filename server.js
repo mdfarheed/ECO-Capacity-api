@@ -48,6 +48,19 @@ app.get('/sitemap.xml', (req, res) => {
 });
 
 
+// =====================================================
+// DEPLOYMENT TEST API
+// =====================================================
+app.get('/api/deploy-test', (req, res) => {
+  res.status(200).json({
+    success: true,
+    message: 'ECO Capacity Backend deployed successfully 🚀',
+    deployment: 'GitHub Actions + cPanel Git',
+    version: 'DEPLOY-TEST-001',
+    timestamp: new Date().toISOString()
+  });
+});
+
 
 
 
@@ -61,6 +74,7 @@ app.use((err, req, res, next) => {
   }
   next();
 });
+
 
 
 const PORT = process.env.PORT || 5000;
