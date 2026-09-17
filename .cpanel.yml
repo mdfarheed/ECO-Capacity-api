@@ -1,8 +1,8 @@
 ---
 deployment:
   tasks:
-    - export DEPLOYPATH=/home/recipco1/repositories/ECO-Capacity-api/
-    - /bin/cp -R * $DEPLOYPATH
-    - cd $DEPLOYPATH && npm install --omit=dev
-    - cd $DEPLOYPATH && ./node_modules/.bin/pm2 restart eco-backend || ./node_modules/.bin/pm2 start server.js --name eco-backend
-    - cd $DEPLOYPATH && ./node_modules/.bin/pm2 save
+    - 'export DEPLOYPATH=/home/recipco1/repositories/ECO-Capacity-api/'
+    - '/bin/cp -R . $DEPLOYPATH'
+    - 'cd $DEPLOYPATH && npm install --omit=dev'
+    - 'cd $DEPLOYPATH && ./node_modules/.bin/pm2 restart eco-backend || ./node_modules/.bin/pm2 start server.js --name eco-backend'
+    - 'cd $DEPLOYPATH && ./node_modules/.bin/pm2 save'
