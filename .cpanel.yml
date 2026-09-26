@@ -1,4 +1,3 @@
----
 deployment:
   tasks:
 
@@ -17,6 +16,7 @@ deployment:
     - /bin/cp -R models $DEPLOYPATH
     - /bin/cp -R routes $DEPLOYPATH
     - /bin/cp -R utils $DEPLOYPATH
+    - /bin/cp -R config $DEPLOYPATH
     - /bin/cp server.js $DEPLOYPATH
     - /bin/cp package.json $DEPLOYPATH
     - /bin/cp package-lock.json $DEPLOYPATH
@@ -33,23 +33,18 @@ deployment:
     - cd $DEPLOYPATH && $NODEPATH/npm install --omit=dev
 
     # ==========================================
-    # PM2 INSTALL / REFRESH
+    # PM2
     # ==========================================
     - $NODEPATH/npm install -g pm2
 
-    # ==========================================
-    # STOP PM2 DAEMON
-    # ==========================================
     - $NODEPATH/pm2 kill || true
 
-    # ==========================================
-    # START BACKEND WITH EXACT NODE
-    # ==========================================
-    - cd $DEPLOYPATH && $NODEPATH/pm2 start server.js --name eco-backend --interpreter $NODEPATH/node --update-env
+    - cd $DEPLOYPATH && \
+      $NODEPATH/pm2 start server.js \
+      --name eco-backend \
+      --interpreter $NODEPATH/node \
+      --update-env
 
-    # ==========================================
-    # SAVE PM2
-    # ==========================================
     - $NODEPATH/pm2 save
 
     # ==========================================
