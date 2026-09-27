@@ -11,34 +11,22 @@ jobs:
 
     steps:
 
-      # ==========================================
-      # 1. Checkout GitHub repository
-      # ==========================================
-      - name: Checkout GitHub repository
+      - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-
-      # ==========================================
-      # 2. Configure SSH
-      # ==========================================
       - name: Configure SSH
         run: |
           mkdir -p ~/.ssh
           chmod 700 ~/.ssh
 
           printf '%s\n' '${{ secrets.CPANEL_SSH_KEY }}' > ~/.ssh/id_ed25519
-
           chmod 600 ~/.ssh/id_ed25519
 
           ssh-keyscan -p 26398 recipco.com >> ~/.ssh/known_hosts
 
-
-      # ==========================================
-      # 3. Test SSH
-      # ==========================================
-      - name: Test SSH Connection
+      - name: Test SSH
         run: |
           ssh \
             -i ~/.ssh/id_ed25519 \
@@ -48,32 +36,7 @@ jobs:
             recipco1@recipco.com \
             "echo SSH_CONNECTION_SUCCESS"
 
-
-      # ==========================================
-      # 4. Push code to cPanel Git repository
-      # ==========================================
-      - name: Push to cPanel Git Repository
-        run: |
-          git config user.name "GitHub Actions"
-          git config user.email "actions@github.com"
-
-          git remote remove cpanel 2>/dev/null || true
-
-          git remote add cpanel \
-            ssh://recipco1@recipco.com:26398/home/recipco1/repositories/eco-capacity-git
-
-          GIT_SSH_COMMAND="ssh \
-            -i ~/.ssh/id_ed25519 \
-            -o IdentitiesOnly=yes \
-            -o StrictHostKeyChecking=yes \
-            -p 26398" \
-            git push cpanel HEAD:main --force
-
-
-      # ==========================================
-      # 5. Trigger cPanel Deployment
-      # ==========================================
-      - name: Deploy cPanel Repository
+      - name: Deploy Latest Commit
         run: |
           ssh \
             -i ~/.ssh/id_ed25519 \
@@ -81,13 +44,9 @@ jobs:
             -o StrictHostKeyChecking=yes \
             -p 26398 \
             recipco1@recipco.com \
-            "/usr/bin/uapi VersionControlDeployment create repository_root=/home/recipco1/repositories/eco-capacity-git"
+            "cd /home/recipco1/repositories/eco-capacity-git && git fetch origin main && git reset --hard origin/main"
 
-
-      # ==========================================
-      # 6. Verify deployment
-      # ==========================================
-      - name: Verify Deployment
+      - name: Run cPanel Deployment
         run: |
           ssh \
             -i ~/.ssh/id_ed25519 \
@@ -95,4 +54,14 @@ jobs:
             -o StrictHostKeyChecking=yes \
             -p 26398 \
             recipco1@recipco.com \
-            "cd /home/recipco1/repositories/ECO-Capacity-api && echo DEPLOYMENT_TRIGGERED && grep -n 'DEPLOY-TEST' server.js || true"
+            "/usr/local/cpanel/bin/uapi VersionControlDeployment create repository_root=/home/recipco1/repositories/eco-capacity-git"
+
+      - name: Verify
+        run: |
+          ssh \
+            -i ~/.ssh/id_ed25519 \
+            -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=yes \
+            -p 26398 \
+            recipco1@recipco.com \
+            "echo '--- CPANEL REPO ---'; cd /home/recipco1/repositories/eco-capacity-git && git log -1 --oneline; echo '--- APP ---'; cd /home/recipco1/repositories/ECO-Capacity-api && git log -1 --oneline"
