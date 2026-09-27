@@ -2,7 +2,7 @@ const Contact = require('../models/Contact');
 const Counter = require('../models/Counter');
 const sendEmail = require('../utils/sendEmail');
 
-const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'farheedsaifi7500@gmail.com';
+const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'contact@ecocapex.com';
 
 const ADMIN_CONTACT_URL =
   'http://localhost:5173/admin?section=contact';
