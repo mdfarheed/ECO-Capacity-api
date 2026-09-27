@@ -11,24 +11,29 @@ jobs:
 
     steps:
 
-      # 1. Checkout
+      # ==========================================
+      # 1. Checkout GitHub
+      # ==========================================
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
+      # ==========================================
       # 2. Configure SSH
+      # ==========================================
       - name: Configure SSH
         run: |
           mkdir -p ~/.ssh
           chmod 700 ~/.ssh
 
           printf '%s\n' '${{ secrets.CPANEL_SSH_KEY }}' > ~/.ssh/id_ed25519
+
           chmod 600 ~/.ssh/id_ed25519
 
           ssh-keyscan -p 26398 recipco.com >> ~/.ssh/known_hosts
 
+      # ==========================================
       # 3. Test SSH
+      # ==========================================
       - name: Test SSH
         run: |
           ssh \
@@ -39,26 +44,10 @@ jobs:
             recipco1@recipco.com \
             "echo SSH_CONNECTION_SUCCESS"
 
-      # 4. Push directly to cPanel managed repository
-      - name: Push to cPanel Git Repository
-        run: |
-          git config user.name "GitHub Actions"
-          git config user.email "actions@github.com"
-
-          git remote remove cpanel 2>/dev/null || true
-
-          git remote add cpanel \
-            ssh://recipco1@recipco.com:26398/home/recipco1/repositories/eco-capacity-git
-
-          GIT_SSH_COMMAND="ssh \
-            -i ~/.ssh/id_ed25519 \
-            -o IdentitiesOnly=yes \
-            -o StrictHostKeyChecking=yes \
-            -p 26398" \
-            git push cpanel HEAD:main --force
-
-      # 5. Verify cPanel repository
-      - name: Verify cPanel Repository
+      # ==========================================
+      # 4. Deploy directly from GitHub
+      # ==========================================
+      - name: Deploy Backend
         run: |
           ssh \
             -i ~/.ssh/id_ed25519 \
@@ -66,10 +55,24 @@ jobs:
             -o StrictHostKeyChecking=yes \
             -p 26398 \
             recipco1@recipco.com \
-            "cd /home/recipco1/repositories/eco-capacity-git && git log -1 --oneline"
+            "cd /home/recipco1/repositories/ECO-Capacity-api && \
+             git fetch origin main && \
+             git reset --hard origin/main && \
+             /home/recipco1/nodevenv/repositories/ECO-Capacity-api/20/bin/npm install --omit=dev && \
+             /home/recipco1/nodevenv/repositories/ECO-Capacity-api/20/bin/npm install -g pm2 && \
+             /home/recipco1/nodevenv/repositories/ECO-Capacity-api/20/bin/pm2 delete eco-backend || true && \
+             /home/recipco1/nodevenv/repositories/ECO-Capacity-api/20/bin/pm2 start server.js \
+             --name eco-backend \
+             --interpreter /home/recipco1/nodevenv/repositories/ECO-Capacity-api/20/bin/node \
+             --update-env && \
+             /home/recipco1/nodevenv/repositories/ECO-Capacity-api/20/bin/pm2 save && \
+             echo DEPLOY_SUCCESS && \
+             git log -1 --oneline"
 
-      # 6. Verify deployed application
-      - name: Verify Application
+      # ==========================================
+      # 5. Verify live files
+      # ==========================================
+      - name: Verify Deployment
         run: |
           ssh \
             -i ~/.ssh/id_ed25519 \
@@ -77,4 +80,8 @@ jobs:
             -o StrictHostKeyChecking=yes \
             -p 26398 \
             recipco1@recipco.com \
-            "cd /home/recipco1/repositories/ECO-Capacity-api && git log -1 --oneline"
+            "cd /home/recipco1/repositories/ECO-Capacity-api && \
+             echo 'LIVE COMMIT:' && \
+             git log -1 --oneline && \
+             echo 'PM2:' && \
+             /home/recipco1/nodevenv/repositories/ECO-Capacity-api/20/bin/pm2 list"
