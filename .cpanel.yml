@@ -2,14 +2,12 @@ deployment:
   tasks:
 
     # ==========================================
-    # PATHS
+    # PATH
     # ==========================================
-    - export DEPLOYPATH=/home/recipco1/repositories/ECO-Capacity-api/
-    - export NODEPATH=/home/recipco1/.nvm/versions/node/v20.20.2/bin
-    - export PATH=$NODEPATH:$PATH
+    - export DEPLOYPATH=/home/recipco1/repositories/ECO-Capacity-api
 
     # ==========================================
-    # COPY PROJECT FILES
+    # COPY APPLICATION FILES
     # ==========================================
     - /bin/cp -R controllers $DEPLOYPATH
     - /bin/cp -R middleware $DEPLOYPATH
@@ -17,37 +15,24 @@ deployment:
     - /bin/cp -R routes $DEPLOYPATH
     - /bin/cp -R utils $DEPLOYPATH
     - /bin/cp -R config $DEPLOYPATH
+
     - /bin/cp server.js $DEPLOYPATH
     - /bin/cp package.json $DEPLOYPATH
     - /bin/cp package-lock.json $DEPLOYPATH
 
     # ==========================================
-    # NODE CHECK
-    # ==========================================
-    - $NODEPATH/node -v
-    - $NODEPATH/npm -v
-
-    # ==========================================
     # INSTALL DEPENDENCIES
     # ==========================================
-    - cd $DEPLOYPATH && $NODEPATH/npm install --omit=dev
+    - cd $DEPLOYPATH && npm install --omit=dev
 
     # ==========================================
-    # PM2
+    # PASSENGER RESTART
     # ==========================================
-    - $NODEPATH/npm install -g pm2
-
-    - $NODEPATH/pm2 kill || true
-
-    - cd $DEPLOYPATH && \
-      $NODEPATH/pm2 start server.js \
-      --name eco-backend \
-      --interpreter $NODEPATH/node \
-      --update-env
-
-    - $NODEPATH/pm2 save
+    - cd $DEPLOYPATH && mkdir -p tmp
+    - cd $DEPLOYPATH && touch tmp/restart.txt
 
     # ==========================================
     # VERIFY
     # ==========================================
-    - $NODEPATH/pm2 list
+    - cd $DEPLOYPATH && node -v
+    - cd $DEPLOYPATH && npm -v

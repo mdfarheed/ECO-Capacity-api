@@ -12,13 +12,15 @@ jobs:
     steps:
 
       # ==========================================
-      # 1. Checkout GitHub
+      # 1. CHECKOUT GITHUB
       # ==========================================
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       # ==========================================
-      # 2. Configure SSH
+      # 2. CONFIGURE SSH
       # ==========================================
       - name: Configure SSH
         run: |
@@ -26,12 +28,13 @@ jobs:
           chmod 700 ~/.ssh
 
           printf '%s\n' '${{ secrets.CPANEL_SSH_KEY }}' > ~/.ssh/id_ed25519
+
           chmod 600 ~/.ssh/id_ed25519
 
           ssh-keyscan -p 26398 recipco.com >> ~/.ssh/known_hosts
 
       # ==========================================
-      # 3. Test SSH
+      # 3. TEST SSH
       # ==========================================
       - name: Test SSH
         run: |
@@ -44,9 +47,9 @@ jobs:
             "echo SSH_CONNECTION_SUCCESS"
 
       # ==========================================
-      # 4. Prepare server
+      # 4. DEPLOY TO CPANEL PASSENGER
       # ==========================================
-      - name: Prepare Server
+      - name: Deploy Backend
         run: |
           ssh \
             -i ~/.ssh/id_ed25519 \
@@ -54,80 +57,50 @@ jobs:
             -o StrictHostKeyChecking=yes \
             -p 26398 \
             recipco1@recipco.com \
-            "mkdir -p /home/recipco1/repositories/ECO-Capacity-api"
+            "
+            set -e
+
+            echo '=========================================='
+            echo 'STARTING DEPLOYMENT'
+            echo '=========================================='
+
+            cd /home/recipco1/repositories/ECO-Capacity-api
+
+            echo 'Current directory:'
+            pwd
+
+            echo 'Fetching latest GitHub code...'
+            git fetch origin main
+
+            echo 'Resetting to latest main...'
+            git reset --hard origin/main
+
+            echo 'Latest commit:'
+            git log -1 --oneline
+
+            echo 'Installing production dependencies...'
+            npm install --omit=dev
+
+            echo 'Preparing Passenger restart...'
+            mkdir -p tmp
+
+            touch tmp/restart.txt
+
+            echo '=========================================='
+            echo 'DEPLOYMENT SUCCESS'
+            echo '=========================================='
+
+            echo 'LIVE COMMIT:'
+            git log -1 --oneline
+
+            echo 'LIVE PATH:'
+            pwd
+
+            echo '=========================================='
+            "
 
       # ==========================================
-      # 5. Copy latest GitHub code
-      # ==========================================
-      - name: Copy Code To Server
-        run: |
-          tar \
-            --exclude='.git' \
-            --exclude='.env' \
-            --exclude='node_modules' \
-            -czf - . | \
-          ssh \
-            -i ~/.ssh/id_ed25519 \
-            -o IdentitiesOnly=yes \
-            -o StrictHostKeyChecking=yes \
-            -p 26398 \
-            recipco1@recipco.com \
-            "tar -xzf - -C /home/recipco1/repositories/ECO-Capacity-api"
-
-      # ==========================================
-      # 6. Install + Restart PM2
-      # ==========================================
-      - name: Install And Restart
-        run: |
-          ssh \
-            -i ~/.ssh/id_ed25519 \
-            -o IdentitiesOnly=yes \
-            -o StrictHostKeyChecking=yes \
-            -p 26398 \
-            recipco1@recipco.com \
-            "bash -lc '
-              cd /home/recipco1/repositories/ECO-Capacity-api
-
-              source /home/recipco1/nodevenv/repositories/ECO-Capacity-api/20/bin/activate
-
-              echo \"NODE:\"
-              which node
-              node -v
-
-              echo \"NPM:\"
-              which npm
-              npm -v
-
-              echo \"Installing dependencies...\"
-              npm install --omit=dev
-
-              echo \"Installing PM2...\"
-              npm install -g pm2
-
-              echo \"PM2 PATH:\"
-              which pm2
-              pm2 -v
-
-              echo \"Stopping old application...\"
-              pm2 delete eco-backend || true
-
-              echo \"Starting application...\"
-              pm2 start server.js \
-                --name eco-backend \
-                --interpreter \"$(which node)\" \
-                --update-env
-
-              pm2 save
-
-              echo \"================================\"
-              echo \"DEPLOY_SUCCESS\"
-              echo \"================================\"
-
-              pm2 list
-            '"
-
-      # ==========================================
-      # 7. Verify
+      # 5. VERIFY LIVE DEPLOYMENT
       # ==========================================
       - name: Verify Deployment
         run: |
@@ -137,16 +110,33 @@ jobs:
             -o StrictHostKeyChecking=yes \
             -p 26398 \
             recipco1@recipco.com \
-            "bash -lc '
-              cd /home/recipco1/repositories/ECO-Capacity-api
+            "
+            cd /home/recipco1/repositories/ECO-Capacity-api
 
-              echo \"LIVE SERVER:\"
-              pwd
+            echo '=========================================='
+            echo 'DEPLOYMENT VERIFICATION'
+            echo '=========================================='
 
-              echo \"FILES:\"
-              ls -la
+            echo 'LIVE COMMIT:'
+            git log -1 --oneline
 
-              echo \"PM2 STATUS:\"
-              source /home/recipco1/nodevenv/repositories/ECO-Capacity-api/20/bin/activate
-              pm2 list
-            '"
+            echo ''
+            echo 'GITHUB ORIGIN:'
+            git remote -v
+
+            echo ''
+            echo 'APPLICATION PATH:'
+            pwd
+
+            echo ''
+            echo 'PASSENGER PROCESS:'
+            ps auxww | grep lnode | grep ECO-Capacity-api | grep -v grep || true
+
+            echo ''
+            echo 'RESTART FILE:'
+            ls -la tmp/restart.txt
+
+            echo '=========================================='
+            echo 'VERIFY COMPLETE'
+            echo '=========================================='
+            "
