@@ -26,7 +26,6 @@ jobs:
           chmod 700 ~/.ssh
 
           printf '%s\n' '${{ secrets.CPANEL_SSH_KEY }}' > ~/.ssh/id_ed25519
-
           chmod 600 ~/.ssh/id_ed25519
 
           ssh-keyscan -p 26398 recipco.com >> ~/.ssh/known_hosts
@@ -45,9 +44,9 @@ jobs:
             "echo SSH_CONNECTION_SUCCESS"
 
       # ==========================================
-      # 4. Deploy directly from GitHub
+      # 4. Prepare server
       # ==========================================
-      - name: Deploy Backend
+      - name: Prepare Server
         run: |
           ssh \
             -i ~/.ssh/id_ed25519 \
@@ -55,22 +54,80 @@ jobs:
             -o StrictHostKeyChecking=yes \
             -p 26398 \
             recipco1@recipco.com \
-            "cd /home/recipco1/repositories/ECO-Capacity-api && \
-             git fetch origin main && \
-             git reset --hard origin/main && \
-             /home/recipco1/nodevenv/repositories/ECO-Capacity-api/20/bin/npm install --omit=dev && \
-             /home/recipco1/nodevenv/repositories/ECO-Capacity-api/20/bin/npm install -g pm2 && \
-             /home/recipco1/nodevenv/repositories/ECO-Capacity-api/20/bin/pm2 delete eco-backend || true && \
-             /home/recipco1/nodevenv/repositories/ECO-Capacity-api/20/bin/pm2 start server.js \
-             --name eco-backend \
-             --interpreter /home/recipco1/nodevenv/repositories/ECO-Capacity-api/20/bin/node \
-             --update-env && \
-             /home/recipco1/nodevenv/repositories/ECO-Capacity-api/20/bin/pm2 save && \
-             echo DEPLOY_SUCCESS && \
-             git log -1 --oneline"
+            "mkdir -p /home/recipco1/repositories/ECO-Capacity-api"
 
       # ==========================================
-      # 5. Verify live files
+      # 5. Copy latest GitHub code
+      # ==========================================
+      - name: Copy Code To Server
+        run: |
+          tar \
+            --exclude='.git' \
+            --exclude='.env' \
+            --exclude='node_modules' \
+            -czf - . | \
+          ssh \
+            -i ~/.ssh/id_ed25519 \
+            -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=yes \
+            -p 26398 \
+            recipco1@recipco.com \
+            "tar -xzf - -C /home/recipco1/repositories/ECO-Capacity-api"
+
+      # ==========================================
+      # 6. Install + Restart PM2
+      # ==========================================
+      - name: Install And Restart
+        run: |
+          ssh \
+            -i ~/.ssh/id_ed25519 \
+            -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=yes \
+            -p 26398 \
+            recipco1@recipco.com \
+            "bash -lc '
+              cd /home/recipco1/repositories/ECO-Capacity-api
+
+              source /home/recipco1/nodevenv/repositories/ECO-Capacity-api/20/bin/activate
+
+              echo \"NODE:\"
+              which node
+              node -v
+
+              echo \"NPM:\"
+              which npm
+              npm -v
+
+              echo \"Installing dependencies...\"
+              npm install --omit=dev
+
+              echo \"Installing PM2...\"
+              npm install -g pm2
+
+              echo \"PM2 PATH:\"
+              which pm2
+              pm2 -v
+
+              echo \"Stopping old application...\"
+              pm2 delete eco-backend || true
+
+              echo \"Starting application...\"
+              pm2 start server.js \
+                --name eco-backend \
+                --interpreter \"$(which node)\" \
+                --update-env
+
+              pm2 save
+
+              echo \"================================\"
+              echo \"DEPLOY_SUCCESS\"
+              echo \"================================\"
+
+              pm2 list
+            '"
+
+      # ==========================================
+      # 7. Verify
       # ==========================================
       - name: Verify Deployment
         run: |
@@ -80,8 +137,16 @@ jobs:
             -o StrictHostKeyChecking=yes \
             -p 26398 \
             recipco1@recipco.com \
-            "cd /home/recipco1/repositories/ECO-Capacity-api && \
-             echo 'LIVE COMMIT:' && \
-             git log -1 --oneline && \
-             echo 'PM2:' && \
-             /home/recipco1/nodevenv/repositories/ECO-Capacity-api/20/bin/pm2 list"
+            "bash -lc '
+              cd /home/recipco1/repositories/ECO-Capacity-api
+
+              echo \"LIVE SERVER:\"
+              pwd
+
+              echo \"FILES:\"
+              ls -la
+
+              echo \"PM2 STATUS:\"
+              source /home/recipco1/nodevenv/repositories/ECO-Capacity-api/20/bin/activate
+              pm2 list
+            '"
