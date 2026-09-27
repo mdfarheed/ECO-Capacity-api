@@ -11,11 +11,13 @@ jobs:
 
     steps:
 
+      # 1. Checkout
       - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
+      # 2. Configure SSH
       - name: Configure SSH
         run: |
           mkdir -p ~/.ssh
@@ -26,6 +28,7 @@ jobs:
 
           ssh-keyscan -p 26398 recipco.com >> ~/.ssh/known_hosts
 
+      # 3. Test SSH
       - name: Test SSH
         run: |
           ssh \
@@ -36,27 +39,26 @@ jobs:
             recipco1@recipco.com \
             "echo SSH_CONNECTION_SUCCESS"
 
-      - name: Deploy Latest Commit
+      # 4. Push directly to cPanel managed repository
+      - name: Push to cPanel Git Repository
         run: |
-          ssh \
-            -i ~/.ssh/id_ed25519 \
-            -o IdentitiesOnly=yes \
-            -o StrictHostKeyChecking=yes \
-            -p 26398 \
-            recipco1@recipco.com \
-            "cd /home/recipco1/repositories/eco-capacity-git && git fetch origin main && git reset --hard origin/main"
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
 
-      - name: Run cPanel Deployment
-        run: |
-          ssh \
-            -i ~/.ssh/id_ed25519 \
-            -o IdentitiesOnly=yes \
-            -o StrictHostKeyChecking=yes \
-            -p 26398 \
-            recipco1@recipco.com \
-            "/usr/local/cpanel/bin/uapi VersionControlDeployment create repository_root=/home/recipco1/repositories/eco-capacity-git"
+          git remote remove cpanel 2>/dev/null || true
 
-      - name: Verify
+          git remote add cpanel \
+            ssh://recipco1@recipco.com:26398/home/recipco1/repositories/eco-capacity-git
+
+          GIT_SSH_COMMAND="ssh \
+            -i ~/.ssh/id_ed25519 \
+            -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=yes \
+            -p 26398" \
+            git push cpanel HEAD:main --force
+
+      # 5. Verify cPanel repository
+      - name: Verify cPanel Repository
         run: |
           ssh \
             -i ~/.ssh/id_ed25519 \
@@ -64,4 +66,15 @@ jobs:
             -o StrictHostKeyChecking=yes \
             -p 26398 \
             recipco1@recipco.com \
-            "echo '--- CPANEL REPO ---'; cd /home/recipco1/repositories/eco-capacity-git && git log -1 --oneline; echo '--- APP ---'; cd /home/recipco1/repositories/ECO-Capacity-api && git log -1 --oneline"
+            "cd /home/recipco1/repositories/eco-capacity-git && git log -1 --oneline"
+
+      # 6. Verify deployed application
+      - name: Verify Application
+        run: |
+          ssh \
+            -i ~/.ssh/id_ed25519 \
+            -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=yes \
+            -p 26398 \
+            recipco1@recipco.com \
+            "cd /home/recipco1/repositories/ECO-Capacity-api && git log -1 --oneline"
