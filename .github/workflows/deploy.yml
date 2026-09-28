@@ -12,7 +12,7 @@ jobs:
     steps:
 
       # ==========================================
-      # 1. CHECKOUT CODE
+      # 1. CHECKOUT
       # ==========================================
       - name: Checkout
         uses: actions/checkout@v4
@@ -21,7 +21,7 @@ jobs:
 
 
       # ==========================================
-      # 2. CONFIGURE SSH
+      # 2. SSH CONFIGURATION
       # ==========================================
       - name: Configure SSH
         shell: bash
@@ -41,7 +41,7 @@ jobs:
 
 
       # ==========================================
-      # 3. TEST SSH CONNECTION
+      # 3. TEST SSH
       # ==========================================
       - name: Test SSH
         shell: bash
@@ -58,7 +58,7 @@ jobs:
 
 
       # ==========================================
-      # 4. DEPLOY TO CPANEL SERVER
+      # 4. DEPLOY
       # ==========================================
       - name: Deploy Backend
         shell: bash
@@ -78,117 +78,139 @@ jobs:
           APP="/home/recipco1/repositories/ECO-Capacity-api"
 
           echo "=========================================="
-          echo "STARTING ECO CAPACITY BACKEND DEPLOYMENT"
+          echo "ECO CAPACITY BACKEND DEPLOYMENT"
           echo "=========================================="
 
           cd "$APP"
 
           echo ""
-          echo "APPLICATION PATH:"
+          echo "APPLICATION:"
           pwd
 
           echo ""
-          echo "FETCHING LATEST CODE..."
+          echo "FETCHING GITHUB..."
           git fetch origin main
 
           echo ""
-          echo "RESETTING TO ORIGIN/MAIN..."
+          echo "SYNCING CODE..."
           git reset --hard origin/main
 
           echo ""
-          echo "DEPLOYED COMMIT:"
+          echo "CURRENT COMMIT:"
           git log -1 --oneline
 
           echo ""
-          echo "INSTALLING PRODUCTION DEPENDENCIES..."
+          echo "CHECKING STARTUP FILES..."
+
+          test -f server.js
+          test -f app.js
+
+          echo "server.js      OK"
+          echo "app.js         OK"
+
+          echo ""
+          echo "INSTALLING DEPENDENCIES..."
+
           npm install --omit=dev
 
           echo ""
-          echo "PREPARING PASSENGER RESTART..."
+          echo "CREATING PASSENGER TMP..."
 
-          mkdir -p "$APP/tmp"
+          mkdir -p tmp
 
-          rm -f "$APP/tmp/restart.txt"
+          rm -f tmp/restart.txt
 
-          touch "$APP/tmp/restart.txt"
-
-          echo ""
-          echo "RESTART FILE:"
-          ls -la "$APP/tmp/restart.txt"
+          touch tmp/restart.txt
 
           echo ""
-          echo "VERIFYING SERVER CODE..."
-
-          grep -n "DEPLOY-TEST" "$APP/server.js" || true
+          echo "PASSENGER RESTART REQUESTED"
 
           echo ""
           echo "WAITING FOR PASSENGER..."
+
           sleep 10
 
           echo ""
           echo "PASSENGER PROCESS:"
+
           ps -ef | grep "[l]snode" || true
 
           echo ""
+          echo "DEPLOYED VERSION:"
+
+          grep -n "DEPLOY-TEST" server.js || true
+
+          echo ""
           echo "=========================================="
-          echo "SERVER DEPLOYMENT COMPLETED"
+          echo "DEPLOYMENT COMMANDS COMPLETED"
           echo "=========================================="
 
           REMOTE_SCRIPT
 
 
       # ==========================================
-      # 5. WAIT FOR PASSENGER / LITESPEED
+      # 5. WAIT FOR LIVE APP
       # ==========================================
-      - name: Wait For Application
+      - name: Wait For Passenger
         shell: bash
         run: |
-          echo "Waiting for Passenger application..."
-
+          echo "Waiting for Passenger..."
           sleep 15
 
 
       # ==========================================
-      # 6. VERIFY LIVE API
+      # 6. LIVE API CHECK
       # ==========================================
-      - name: Verify Live Deployment
+      - name: Verify Live API
         shell: bash
         run: |
           set -e
 
           echo "=========================================="
-          echo "VERIFYING LIVE API"
+          echo "LIVE API CHECK"
           echo "=========================================="
 
-          RESPONSE=$(curl \
-            --fail \
+          HTTP_CODE=$(curl \
             --silent \
             --show-error \
             --max-time 30 \
+            --output /tmp/api-response.txt \
+            --write-out "%{http_code}" \
             https://eco-api.ecocapacityexchange.com/api/deploy-test)
 
           echo ""
-          echo "LIVE RESPONSE:"
-          echo "$RESPONSE"
+          echo "HTTP STATUS:"
+          echo "$HTTP_CODE"
+
+          echo ""
+          echo "API RESPONSE:"
+          cat /tmp/api-response.txt
 
           echo ""
 
-          if echo "$RESPONSE" | grep -q '"success":true'; then
-            echo "=========================================="
-            echo "LIVE API IS WORKING"
-            echo "=========================================="
-          else
-            echo "=========================================="
-            echo "LIVE API VERIFICATION FAILED"
-            echo "=========================================="
+          if [ "$HTTP_CODE" != "200" ]; then
+            echo ""
+            echo "LIVE API FAILED"
+            echo "HTTP STATUS: $HTTP_CODE"
             exit 1
           fi
 
+          if ! grep -q '"success":true' /tmp/api-response.txt; then
+            echo ""
+            echo "API RESPONSE IS NOT VALID"
+            exit 1
+          fi
+
+          echo ""
+          echo "=========================================="
+          echo "LIVE API IS WORKING"
+          echo "=========================================="
+
 
       # ==========================================
-      # 7. VERIFY DEPLOYED COMMIT ON SERVER
+      # 7. FINAL SERVER VERIFICATION
       # ==========================================
-      - name: Verify Server Commit
+      - name: Verify Server
         shell: bash
         run: |
           set -e
@@ -199,15 +221,39 @@ jobs:
             -o StrictHostKeyChecking=yes \
             -p 26398 \
             recipco1@recipco.com \
-            "cd /home/recipco1/repositories/ECO-Capacity-api && \
-             echo 'SERVER COMMIT:' && \
-             git log -1 --oneline && \
-             echo 'SERVER PATH:' && \
-             pwd && \
-             echo 'RESTART FILE:' && \
-             ls -la tmp/restart.txt"
+            'bash -s' <<'REMOTE_VERIFY'
+
+          APP="/home/recipco1/repositories/ECO-Capacity-api"
+
+          cd "$APP"
+
+          echo "=========================================="
+          echo "FINAL SERVER VERIFICATION"
+          echo "=========================================="
+
+          echo ""
+          echo "COMMIT:"
+          git log -1 --oneline
+
+          echo ""
+          echo "STARTUP FILE:"
+          ls -lh app.js
+
+          echo ""
+          echo "SERVER FILE:"
+          ls -lh server.js
+
+          echo ""
+          echo "RESTART FILE:"
+          ls -lh tmp/restart.txt
+
+          echo ""
+          echo "PASSENGER:"
+          ps -ef | grep "[l]snode" || true
 
           echo ""
           echo "=========================================="
-          echo "CI/CD DEPLOYMENT FINISHED"
+          echo "CI/CD COMPLETE"
           echo "=========================================="
+
+          REMOTE_VERIFY
