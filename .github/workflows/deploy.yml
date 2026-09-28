@@ -10,133 +10,48 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-
-      # ==========================================
-      # 1. CHECKOUT GITHUB
-      # ==========================================
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
-      # ==========================================
-      # 2. CONFIGURE SSH
-      # ==========================================
       - name: Configure SSH
         run: |
           mkdir -p ~/.ssh
           chmod 700 ~/.ssh
 
           printf '%s\n' '${{ secrets.CPANEL_SSH_KEY }}' > ~/.ssh/id_ed25519
-
           chmod 600 ~/.ssh/id_ed25519
 
           ssh-keyscan -p 26398 recipco.com >> ~/.ssh/known_hosts
 
-      # ==========================================
-      # 3. TEST SSH
-      # ==========================================
       - name: Test SSH
         run: |
           ssh \
             -i ~/.ssh/id_ed25519 \
             -o IdentitiesOnly=yes \
-            -o StrictHostKeyChecking=yes \
             -p 26398 \
             recipco1@recipco.com \
             "echo SSH_CONNECTION_SUCCESS"
 
-      # ==========================================
-      # 4. DEPLOY TO CPANEL PASSENGER
-      # ==========================================
-      - name: Deploy Backend
+      - name: Deploy
         run: |
           ssh \
             -i ~/.ssh/id_ed25519 \
             -o IdentitiesOnly=yes \
-            -o StrictHostKeyChecking=yes \
             -p 26398 \
             recipco1@recipco.com \
-            "
-            set -e
+            "cd /home/recipco1/repositories/ECO-Capacity-api && \
+             git fetch origin main && \
+             git reset --hard origin/main && \
+             npm install --omit=dev && \
+             mkdir -p tmp && \
+             rm -f tmp/restart.txt && \
+             touch tmp/restart.txt && \
+             echo LIVE_COMMIT && \
+             git log -1 --oneline"
 
-            echo '=========================================='
-            echo 'STARTING DEPLOYMENT'
-            echo '=========================================='
-
-            cd /home/recipco1/repositories/ECO-Capacity-api
-
-            echo 'Current directory:'
-            pwd
-
-            echo 'Fetching latest GitHub code...'
-            git fetch origin main
-
-            echo 'Resetting to latest main...'
-            git reset --hard origin/main
-
-            echo 'Latest commit:'
-            git log -1 --oneline
-
-            echo 'Installing production dependencies...'
-            npm install --omit=dev
-
-            echo 'Preparing Passenger restart...'
-            mkdir -p tmp
-
-            touch tmp/restart.txt
-
-            echo '=========================================='
-            echo 'DEPLOYMENT SUCCESS'
-            echo '=========================================='
-
-            echo 'LIVE COMMIT:'
-            git log -1 --oneline
-
-            echo 'LIVE PATH:'
-            pwd
-
-            echo '=========================================='
-            "
-
-      # ==========================================
-      # 5. VERIFY LIVE DEPLOYMENT
-      # ==========================================
-      - name: Verify Deployment
+      - name: Verify
         run: |
-          ssh \
-            -i ~/.ssh/id_ed25519 \
-            -o IdentitiesOnly=yes \
-            -o StrictHostKeyChecking=yes \
-            -p 26398 \
-            recipco1@recipco.com \
-            "
-            cd /home/recipco1/repositories/ECO-Capacity-api
+          sleep 10
 
-            echo '=========================================='
-            echo 'DEPLOYMENT VERIFICATION'
-            echo '=========================================='
-
-            echo 'LIVE COMMIT:'
-            git log -1 --oneline
-
-            echo ''
-            echo 'GITHUB ORIGIN:'
-            git remote -v
-
-            echo ''
-            echo 'APPLICATION PATH:'
-            pwd
-
-            echo ''
-            echo 'PASSENGER PROCESS:'
-            ps auxww | grep lnode | grep ECO-Capacity-api | grep -v grep || true
-
-            echo ''
-            echo 'RESTART FILE:'
-            ls -la tmp/restart.txt
-
-            echo '=========================================='
-            echo 'VERIFY COMPLETE'
-            echo '=========================================='
-            "
+          curl -fsS \
+            https://eco-api.ecocapacityexchange.com/api/deploy-test
