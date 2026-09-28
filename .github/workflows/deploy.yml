@@ -12,7 +12,7 @@ jobs:
     steps:
 
       # ==========================================
-      # 1. CHECKOUT
+      # CHECKOUT
       # ==========================================
       - name: Checkout
         uses: actions/checkout@v4
@@ -21,7 +21,7 @@ jobs:
 
 
       # ==========================================
-      # 2. SSH CONFIGURATION
+      # SSH CONFIG
       # ==========================================
       - name: Configure SSH
         shell: bash
@@ -31,17 +31,19 @@ jobs:
           mkdir -p ~/.ssh
           chmod 700 ~/.ssh
 
-          printf '%s\n' '${{ secrets.CPANEL_SSH_KEY }}' > ~/.ssh/id_ed25519
+          printf '%s\n' '${{ secrets.CPANEL_SSH_KEY }}' \
+            > ~/.ssh/id_ed25519
 
           chmod 600 ~/.ssh/id_ed25519
 
-          ssh-keyscan -p 26398 recipco.com >> ~/.ssh/known_hosts
+          ssh-keyscan -p 26398 recipco.com \
+            >> ~/.ssh/known_hosts
 
           chmod 644 ~/.ssh/known_hosts
 
 
       # ==========================================
-      # 3. TEST SSH
+      # TEST SSH
       # ==========================================
       - name: Test SSH
         shell: bash
@@ -58,7 +60,7 @@ jobs:
 
 
       # ==========================================
-      # 4. DEPLOY
+      # DEPLOY
       # ==========================================
       - name: Deploy Backend
         shell: bash
@@ -78,88 +80,70 @@ jobs:
           APP="/home/recipco1/repositories/ECO-Capacity-api"
 
           echo "=========================================="
-          echo "ECO CAPACITY BACKEND DEPLOYMENT"
+          echo "ECO CAPACITY BACKEND DEPLOY"
           echo "=========================================="
 
           cd "$APP"
 
           echo ""
-          echo "APPLICATION:"
+          echo "PATH:"
           pwd
 
           echo ""
-          echo "FETCHING GITHUB..."
+          echo "FETCH MAIN:"
           git fetch origin main
 
           echo ""
-          echo "SYNCING CODE..."
+          echo "RESET TO ORIGIN/MAIN:"
           git reset --hard origin/main
 
           echo ""
-          echo "CURRENT COMMIT:"
+          echo "DEPLOYED COMMIT:"
           git log -1 --oneline
 
           echo ""
-          echo "CHECKING STARTUP FILES..."
-
-          test -f server.js
-          test -f app.js
-
-          echo "server.js      OK"
-          echo "app.js         OK"
-
-          echo ""
-          echo "INSTALLING DEPENDENCIES..."
-
-          npm install --omit=dev
-
-          echo ""
-          echo "CREATING PASSENGER TMP..."
-
-          mkdir -p tmp
-
-          rm -f tmp/restart.txt
-
-          touch tmp/restart.txt
-
-          echo ""
-          echo "PASSENGER RESTART REQUESTED"
-
-          echo ""
-          echo "WAITING FOR PASSENGER..."
-
-          sleep 10
-
-          echo ""
-          echo "PASSENGER PROCESS:"
-
-          ps -ef | grep "[l]snode" || true
-
-          echo ""
           echo "DEPLOYED VERSION:"
-
           grep -n "DEPLOY-TEST" server.js || true
 
           echo ""
-          echo "=========================================="
-          echo "DEPLOYMENT COMMANDS COMPLETED"
-          echo "=========================================="
+          echo "PACKAGE:"
+          cat package.json
+
+          echo ""
+          echo "INSTALL DEPENDENCIES:"
+          npm install --omit=dev
+
+          echo ""
+          echo "PASSENGER RESTART:"
+
+          mkdir -p "$APP/tmp"
+
+          rm -f "$APP/tmp/restart.txt"
+
+          touch "$APP/tmp/restart.txt"
+
+          chmod 755 "$APP/tmp"
+
+          echo ""
+          echo "RESTART FILE:"
+          ls -la "$APP/tmp/restart.txt"
+
+          echo ""
+          echo "WAITING..."
+          sleep 10
+
+          echo ""
+          echo "PASSENGER PROCESS BEFORE LIVE REQUEST:"
+          ps -ef | grep "[l]snode.*ECO-Capacity-api" || true
+
+          echo ""
+          echo "DEPLOYMENT COMPLETE"
 
           REMOTE_SCRIPT
 
 
       # ==========================================
-      # 5. WAIT FOR LIVE APP
-      # ==========================================
-      - name: Wait For Passenger
-        shell: bash
-        run: |
-          echo "Waiting for Passenger..."
-          sleep 15
-
-
-      # ==========================================
-      # 6. LIVE API CHECK
+      # LIVE API CHECK
       # ==========================================
       - name: Verify Live API
         shell: bash
@@ -167,48 +151,60 @@ jobs:
           set -e
 
           echo "=========================================="
-          echo "LIVE API CHECK"
+          echo "LIVE API VERIFICATION"
           echo "=========================================="
 
-          HTTP_CODE=$(curl \
-            --silent \
-            --show-error \
-            --max-time 30 \
-            --output /tmp/api-response.txt \
-            --write-out "%{http_code}" \
-            https://eco-api.ecocapacityexchange.com/api/deploy-test)
+          SUCCESS=0
 
-          echo ""
-          echo "HTTP STATUS:"
-          echo "$HTTP_CODE"
+          for i in 1 2 3 4 5 6 7 8 9 10
+          do
 
-          echo ""
-          echo "API RESPONSE:"
-          cat /tmp/api-response.txt
-
-          echo ""
-
-          if [ "$HTTP_CODE" != "200" ]; then
             echo ""
+            echo "Attempt $i/10"
+
+            HTTP_CODE=$(curl \
+              --silent \
+              --show-error \
+              --max-time 30 \
+              --output /tmp/api-response.txt \
+              --write-out "%{http_code}" \
+              https://eco-api.ecocapacityexchange.com/api/deploy-test)
+
+            echo "HTTP: $HTTP_CODE"
+
+            echo "RESPONSE:"
+            cat /tmp/api-response.txt
+
+            if [ "$HTTP_CODE" = "200" ] && \
+               grep -q '"success":true' /tmp/api-response.txt
+            then
+
+              echo ""
+              echo "LIVE API IS WORKING"
+
+              SUCCESS=1
+              break
+
+            fi
+
+            echo ""
+            echo "Live API not ready."
+            sleep 10
+
+          done
+
+          if [ "$SUCCESS" -ne 1 ]
+          then
+            echo ""
+            echo "=========================================="
             echo "LIVE API FAILED"
-            echo "HTTP STATUS: $HTTP_CODE"
+            echo "=========================================="
             exit 1
           fi
-
-          if ! grep -q '"success":true' /tmp/api-response.txt; then
-            echo ""
-            echo "API RESPONSE IS NOT VALID"
-            exit 1
-          fi
-
-          echo ""
-          echo "=========================================="
-          echo "LIVE API IS WORKING"
-          echo "=========================================="
 
 
       # ==========================================
-      # 7. FINAL SERVER VERIFICATION
+      # FINAL SERVER VERIFICATION
       # ==========================================
       - name: Verify Server
         shell: bash
@@ -223,12 +219,14 @@ jobs:
             recipco1@recipco.com \
             'bash -s' <<'REMOTE_VERIFY'
 
+          set -e
+
           APP="/home/recipco1/repositories/ECO-Capacity-api"
 
           cd "$APP"
 
           echo "=========================================="
-          echo "FINAL SERVER VERIFICATION"
+          echo "FINAL SERVER CHECK"
           echo "=========================================="
 
           echo ""
@@ -236,24 +234,20 @@ jobs:
           git log -1 --oneline
 
           echo ""
-          echo "STARTUP FILE:"
-          ls -lh app.js
-
-          echo ""
-          echo "SERVER FILE:"
-          ls -lh server.js
-
-          echo ""
-          echo "RESTART FILE:"
-          ls -lh tmp/restart.txt
+          echo "SERVER VERSION:"
+          grep -n "DEPLOY-TEST" server.js
 
           echo ""
           echo "PASSENGER:"
-          ps -ef | grep "[l]snode" || true
+          ps -ef | grep "[l]snode.*ECO-Capacity-api" || true
+
+          echo ""
+          echo "RESTART FILE:"
+          ls -la tmp/restart.txt
 
           echo ""
           echo "=========================================="
-          echo "CI/CD COMPLETE"
+          echo "DEPLOYMENT FINISHED"
           echo "=========================================="
 
           REMOTE_VERIFY

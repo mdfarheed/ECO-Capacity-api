@@ -1,0 +1,16 @@
+---
+deployment:
+  tasks:
+    - export DEPLOYPATH=/home/recipco1/repositories/ECO-Capacity-api/
+
+    - /bin/mkdir -p $DEPLOYPATH/tmp
+
+    - /bin/touch $DEPLOYPATH/tmp/restart.txt
+
+    - /bin/chmod 755 $DEPLOYPATH
+
+    - /bin/chmod 755 $DEPLOYPATH/tmp
+
+    - /bin/echo "Passenger restart triggered"
+
+    - /bin/sleep 5
