@@ -3,18 +3,6 @@ deployment:
   tasks:
     - export DEPLOYPATH=/home/recipco1/repositories/ECO-Capacity-api/
 
-    - /bin/cp -f server.js $DEPLOYPATH
-    - /bin/cp -f package.json $DEPLOYPATH
-    - /bin/cp -f package-lock.json $DEPLOYPATH
-
-    - /bin/cp -R config $DEPLOYPATH
-    - /bin/cp -R controllers $DEPLOYPATH
-    - /bin/cp -R middleware $DEPLOYPATH
-    - /bin/cp -R models $DEPLOYPATH
-    - /bin/cp -R routesutils $DEPLOYPATH
-
     - /bin/mkdir -p $DEPLOYPATH/tmp
-    - /bin/rm -f $DEPLOYPATH/tmp/restart.txt
-    - /bin/touch $DEPLOYPATH/tmp/restart.txt
 
-    - /bin/echo "DEPLOYMENT_SUCCESS $(date)" >> $DEPLOYPATH/deployment.log
+    - /bin/touch $DEPLOYPATH/tmp/restart.txt

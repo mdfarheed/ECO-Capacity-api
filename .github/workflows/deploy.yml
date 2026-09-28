@@ -12,180 +12,122 @@ jobs:
     steps:
 
       # ==========================================
-      # 1. CHECKOUT
+      # DEPLOY BACKEND TO CPANEL
       # ==========================================
-      - name: Checkout Repository
-        uses: actions/checkout@v4
+      - name: Deploy ECO Capacity Backend
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.CPANEL_HOST }}
+          username: ${{ secrets.CPANEL_USERNAME }}
+          port: ${{ secrets.CPANEL_PORT }}
+          key: ${{ secrets.CPANEL_SSH_KEY }}
 
+          script: |
+            set -e
 
-      # ==========================================
-      # 2. VERIFY COMMIT
-      # ==========================================
-      - name: Verify Deployment Commit
-        run: |
-          set -e
-
-          echo "=========================================="
-          echo "DEPLOYMENT COMMIT"
-          echo "=========================================="
-
-          git rev-parse HEAD
-          git log -1 --oneline
-
-
-      # ==========================================
-      # 3. DEPLOY TO CPANEL GIT REPOSITORY
-      # ==========================================
-      - name: Deploy To cPanel
-        run: |
-          set -e
-
-          echo "=========================================="
-          echo "DEPLOYING ECO CAPACITY BACKEND"
-          echo "=========================================="
-
-          git config --global user.name "GitHub Actions"
-          git config --global user.email "actions@github.com"
-
-          git remote add cpanel \
-            "https://${{ secrets.CPANEL_GIT_USERNAME }}:${{ secrets.CPANEL_GIT_TOKEN }}@github.com/mdfarheed/ECO-Capacity-api.git" \
-            2>/dev/null || true
-
-          echo "Repository checkout completed."
-
-          echo "Deployment is handled by cPanel Git Version Control."
-
-
-      # ==========================================
-      # 4. DEPLOYMENT INFORMATION
-      # ==========================================
-      - name: Deployment Information
-        run: |
-          echo "=========================================="
-          echo "DEPLOYMENT INFORMATION"
-          echo "=========================================="
-
-          echo "Repository:"
-          echo "https://github.com/mdfarheed/ECO-Capacity-api"
-
-          echo ""
-
-          echo "Branch:"
-          echo "main"
-
-          echo ""
-
-          echo "Commit:"
-          git rev-parse HEAD
-
-          echo ""
-
-          echo "Message:"
-          git log -1 --pretty=%B
-
-          echo "=========================================="
-
-
-      # ==========================================
-      # 5. WAIT FOR CPANEL DEPLOYMENT
-      # ==========================================
-      - name: Wait For cPanel Deployment
-        run: |
-          echo "Waiting for cPanel deployment..."
-          sleep 20
-
-
-      # ==========================================
-      # 6. LIVE API CHECK
-      # ==========================================
-      - name: Live API Check
-        continue-on-error: true
-        run: |
-          set -u
-
-          URL="https://eco-api.ecocapacityexchange.com/api/deploy-test"
-
-          echo "=========================================="
-          echo "LIVE API CHECK"
-          echo "=========================================="
-
-          for i in 1 2 3 4 5 6; do
-
-            echo ""
-            echo "=========================================="
-            echo "ATTEMPT $i/6"
-            echo "=========================================="
-
-            HTTP_CODE=$(curl \
-              --silent \
-              --show-error \
-              --location \
-              --max-time 30 \
-              --output /tmp/api-response.txt \
-              --write-out "%{http_code}" \
-              "$URL" || true)
-
-            echo ""
-            echo "HTTP STATUS:"
-            echo "$HTTP_CODE"
-
-            echo ""
-            echo "RESPONSE:"
-            head -c 3000 /tmp/api-response.txt || true
-
-            echo ""
+            echo "======================================"
+            echo "ECO CAPACITY BACKEND DEPLOYMENT"
+            echo "======================================"
 
             # --------------------------------------
-            # SUCCESS
+            # NODE PATH
             # --------------------------------------
-            if grep -q '"success"[[:space:]]*:[[:space:]]*true' /tmp/api-response.txt 2>/dev/null; then
+            export NODEPATH=/home/recipco1/.nvm/versions/node/v20.20.2/bin
+            export PATH=$NODEPATH:$PATH
 
-              echo ""
-              echo "=========================================="
-              echo "LIVE API IS WORKING"
-              echo "=========================================="
+            echo "Node:"
+            node -v
 
-              exit 0
+            echo "NPM:"
+            npm -v
+
+            # --------------------------------------
+            # PATHS
+            # --------------------------------------
+            REPOPATH=/home/recipco1/repositories/eco-capacity-git
+            DEPLOYPATH=/home/recipco1/repositories/ECO-Capacity-api
+
+            echo "REPOPATH=$REPOPATH"
+            echo "DEPLOYPATH=$DEPLOYPATH"
+
+            # --------------------------------------
+            # GO TO CPANEL GIT REPOSITORY
+            # --------------------------------------
+            cd $REPOPATH
+
+            echo "======================================"
+            echo "PULLING LATEST GITHUB CODE"
+            echo "======================================"
+
+            git fetch origin main
+            git reset --hard origin/main
+
+            echo "Latest commit:"
+            git log -1 --oneline
+
+            echo "Version in repository:"
+            grep -n "DEPLOY-TEST" server.js || true
+
+            # --------------------------------------
+            # DEPLOY FILES
+            # --------------------------------------
+            echo "======================================"
+            echo "COPYING BACKEND FILES"
+            echo "======================================"
+
+            /bin/cp -f server.js $DEPLOYPATH/
+            /bin/cp -f package.json $DEPLOYPATH/
+            /bin/cp -f package-lock.json $DEPLOYPATH/
+
+            # --------------------------------------
+            # COPY BACKEND DIRECTORIES
+            # --------------------------------------
+            /bin/cp -R config $DEPLOYPATH/
+            /bin/cp -R controllers $DEPLOYPATH/
+            /bin/cp -R middleware $DEPLOYPATH/
+            /bin/cp -R models $DEPLOYPATH/
+            /bin/cp -R routesutils $DEPLOYPATH/
+
+            # --------------------------------------
+            # OPTIONAL FILES
+            # --------------------------------------
+            if [ -f .htaccess ]; then
+              /bin/cp -f .htaccess $DEPLOYPATH/
             fi
 
+            # --------------------------------------
+            # INSTALL DEPENDENCIES
+            # --------------------------------------
+            echo "======================================"
+            echo "INSTALLING BACKEND DEPENDENCIES"
+            echo "======================================"
+
+            cd $DEPLOYPATH
+
+            $NODEPATH/npm ci --omit=dev
 
             # --------------------------------------
-            # HOSTING SECURITY PAGE
+            # PASSENGER RESTART
             # --------------------------------------
-            if grep -qi \
-              "Please wait while your request is being verified" \
-              /tmp/api-response.txt 2>/dev/null; then
+            echo "======================================"
+            echo "RESTARTING PASSENGER"
+            echo "======================================"
 
-              echo ""
-              echo "=========================================="
-              echo "HOSTING SECURITY VERIFICATION DETECTED"
-              echo "=========================================="
+            /bin/mkdir -p $DEPLOYPATH/tmp
 
-              echo "The application is responding with the hosting"
-              echo "security verification page instead of JSON."
+            /bin/rm -f $DEPLOYPATH/tmp/restart.txt
 
-              echo "This is not an Express/MongoDB application error."
+            /bin/touch $DEPLOYPATH/tmp/restart.txt
 
-            fi
+            # --------------------------------------
+            # VERIFY FILE
+            # --------------------------------------
+            echo "======================================"
+            echo "VERIFYING DEPLOYED FILE"
+            echo "======================================"
 
+            grep -n "DEPLOY-TEST" $DEPLOYPATH/server.js
 
-            echo ""
-            echo "API not ready yet."
-            echo "Waiting 10 seconds..."
-
-            sleep 10
-
-          done
-
-
-          echo ""
-          echo "=========================================="
-          echo "LIVE API CHECK FINISHED"
-          echo "=========================================="
-
-          echo "The deployment workflow itself completed."
-          echo "The public endpoint could not be verified from"
-          echo "the GitHub Actions runner."
-
-          echo ""
-          echo "This does NOT automatically mark deployment as failed."
+            echo "======================================"
+            echo "ECO CAPACITY BACKEND DEPLOYED"
+            echo "======================================"
