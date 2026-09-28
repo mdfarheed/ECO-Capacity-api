@@ -28,6 +28,7 @@ jobs:
           ssh \
             -i ~/.ssh/id_ed25519 \
             -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=yes \
             -p 26398 \
             recipco1@recipco.com \
             "echo SSH_CONNECTION_SUCCESS"
@@ -37,21 +38,66 @@ jobs:
           ssh \
             -i ~/.ssh/id_ed25519 \
             -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=yes \
             -p 26398 \
             recipco1@recipco.com \
-            "cd /home/recipco1/repositories/ECO-Capacity-api && \
-             git fetch origin main && \
-             git reset --hard origin/main && \
-             npm install --omit=dev && \
-             mkdir -p tmp && \
-             rm -f tmp/restart.txt && \
-             touch tmp/restart.txt && \
-             echo LIVE_COMMIT && \
-             git log -1 --oneline"
+            'bash -s' <<'REMOTE'
 
-      - name: Verify
+          set -e
+
+          APP="/home/recipco1/repositories/ECO-Capacity-api"
+
+          echo "======================================"
+          echo "DEPLOYING ECO CAPACITY API"
+          echo "======================================"
+
+          cd "$APP"
+
+          echo "Fetching GitHub..."
+          git fetch origin main
+
+          echo "Resetting application..."
+          git reset --hard origin/main
+
+          echo "LIVE COMMIT:"
+          git log -1 --oneline
+
+          echo "Installing dependencies..."
+          npm install --omit=dev
+
+          echo "Restarting Passenger..."
+
+          mkdir -p tmp
+          rm -f tmp/restart.txt
+          touch tmp/restart.txt
+
+          # Passenger restart signal
+          sleep 3
+
+          echo "Checking application files..."
+          test -f server.js
+
+          echo "======================================"
+          echo "DEPLOY FINISHED"
+          echo "======================================"
+
+          REMOTE
+
+      - name: Wait for Passenger
         run: |
-          sleep 10
+          sleep 15
 
-          curl -fsS \
+      - name: Verify Live API
+        run: |
+          echo "Checking live API..."
+
+          curl -fLsS \
+            --retry 5 \
+            --retry-delay 3 \
+            --retry-all-errors \
             https://eco-api.ecocapacityexchange.com/api/deploy-test
+
+          echo ""
+          echo "======================================"
+          echo "LIVE API VERIFIED"
+          echo "======================================"
