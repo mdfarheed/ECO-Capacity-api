@@ -10,21 +10,44 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+
+      # ==========================================
+      # 1. CHECKOUT CODE
+      # ==========================================
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
+
+      # ==========================================
+      # 2. CONFIGURE SSH
+      # ==========================================
       - name: Configure SSH
+        shell: bash
         run: |
+          set -e
+
           mkdir -p ~/.ssh
           chmod 700 ~/.ssh
 
           printf '%s\n' '${{ secrets.CPANEL_SSH_KEY }}' > ~/.ssh/id_ed25519
+
           chmod 600 ~/.ssh/id_ed25519
 
           ssh-keyscan -p 26398 recipco.com >> ~/.ssh/known_hosts
 
+          chmod 644 ~/.ssh/known_hosts
+
+
+      # ==========================================
+      # 3. TEST SSH CONNECTION
+      # ==========================================
       - name: Test SSH
+        shell: bash
         run: |
+          set -e
+
           ssh \
             -i ~/.ssh/id_ed25519 \
             -o IdentitiesOnly=yes \
@@ -33,71 +56,158 @@ jobs:
             recipco1@recipco.com \
             "echo SSH_CONNECTION_SUCCESS"
 
-      - name: Deploy
+
+      # ==========================================
+      # 4. DEPLOY TO CPANEL SERVER
+      # ==========================================
+      - name: Deploy Backend
+        shell: bash
         run: |
+          set -e
+
           ssh \
             -i ~/.ssh/id_ed25519 \
             -o IdentitiesOnly=yes \
             -o StrictHostKeyChecking=yes \
             -p 26398 \
             recipco1@recipco.com \
-            'bash -s' <<'REMOTE'
+            'bash -s' <<'REMOTE_SCRIPT'
 
           set -e
 
           APP="/home/recipco1/repositories/ECO-Capacity-api"
 
-          echo "======================================"
-          echo "DEPLOYING ECO CAPACITY API"
-          echo "======================================"
+          echo "=========================================="
+          echo "STARTING ECO CAPACITY BACKEND DEPLOYMENT"
+          echo "=========================================="
 
           cd "$APP"
 
-          echo "Fetching GitHub..."
-          git fetch origin main
-
-          echo "Resetting application..."
-          git reset --hard origin/main
-
-          echo "LIVE COMMIT:"
-          git log -1 --oneline
-
-          echo "Installing dependencies..."
-          npm install --omit=dev
-
-          echo "Restarting Passenger..."
-
-          mkdir -p tmp
-          rm -f tmp/restart.txt
-          touch tmp/restart.txt
-
-          # Passenger restart signal
-          sleep 3
-
-          echo "Checking application files..."
-          test -f server.js
-
-          echo "======================================"
-          echo "DEPLOY FINISHED"
-          echo "======================================"
-
-          REMOTE
-
-      - name: Wait for Passenger
-        run: |
-          sleep 15
-
-      - name: Verify Live API
-        run: |
-          echo "Checking live API..."
-
-          curl -fLsS \
-            --retry 5 \
-            --retry-delay 3 \
-            --retry-all-errors \
-            https://eco-api.ecocapacityexchange.com/api/deploy-test
+          echo ""
+          echo "APPLICATION PATH:"
+          pwd
 
           echo ""
-          echo "======================================"
-          echo "LIVE API VERIFIED"
-          echo "======================================"
+          echo "FETCHING LATEST CODE..."
+          git fetch origin main
+
+          echo ""
+          echo "RESETTING TO ORIGIN/MAIN..."
+          git reset --hard origin/main
+
+          echo ""
+          echo "DEPLOYED COMMIT:"
+          git log -1 --oneline
+
+          echo ""
+          echo "INSTALLING PRODUCTION DEPENDENCIES..."
+          npm install --omit=dev
+
+          echo ""
+          echo "PREPARING PASSENGER RESTART..."
+
+          mkdir -p "$APP/tmp"
+
+          rm -f "$APP/tmp/restart.txt"
+
+          touch "$APP/tmp/restart.txt"
+
+          echo ""
+          echo "RESTART FILE:"
+          ls -la "$APP/tmp/restart.txt"
+
+          echo ""
+          echo "VERIFYING SERVER CODE..."
+
+          grep -n "DEPLOY-TEST" "$APP/server.js" || true
+
+          echo ""
+          echo "WAITING FOR PASSENGER..."
+          sleep 10
+
+          echo ""
+          echo "PASSENGER PROCESS:"
+          ps -ef | grep "[l]snode" || true
+
+          echo ""
+          echo "=========================================="
+          echo "SERVER DEPLOYMENT COMPLETED"
+          echo "=========================================="
+
+          REMOTE_SCRIPT
+
+
+      # ==========================================
+      # 5. WAIT FOR PASSENGER / LITESPEED
+      # ==========================================
+      - name: Wait For Application
+        shell: bash
+        run: |
+          echo "Waiting for Passenger application..."
+
+          sleep 15
+
+
+      # ==========================================
+      # 6. VERIFY LIVE API
+      # ==========================================
+      - name: Verify Live Deployment
+        shell: bash
+        run: |
+          set -e
+
+          echo "=========================================="
+          echo "VERIFYING LIVE API"
+          echo "=========================================="
+
+          RESPONSE=$(curl \
+            --fail \
+            --silent \
+            --show-error \
+            --max-time 30 \
+            https://eco-api.ecocapacityexchange.com/api/deploy-test)
+
+          echo ""
+          echo "LIVE RESPONSE:"
+          echo "$RESPONSE"
+
+          echo ""
+
+          if echo "$RESPONSE" | grep -q '"success":true'; then
+            echo "=========================================="
+            echo "LIVE API IS WORKING"
+            echo "=========================================="
+          else
+            echo "=========================================="
+            echo "LIVE API VERIFICATION FAILED"
+            echo "=========================================="
+            exit 1
+          fi
+
+
+      # ==========================================
+      # 7. VERIFY DEPLOYED COMMIT ON SERVER
+      # ==========================================
+      - name: Verify Server Commit
+        shell: bash
+        run: |
+          set -e
+
+          ssh \
+            -i ~/.ssh/id_ed25519 \
+            -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=yes \
+            -p 26398 \
+            recipco1@recipco.com \
+            "cd /home/recipco1/repositories/ECO-Capacity-api && \
+             echo 'SERVER COMMIT:' && \
+             git log -1 --oneline && \
+             echo 'SERVER PATH:' && \
+             pwd && \
+             echo 'RESTART FILE:' && \
+             ls -la tmp/restart.txt"
+
+          echo ""
+          echo "=========================================="
+          echo "CI/CD DEPLOYMENT FINISHED"
+          echo "=========================================="
