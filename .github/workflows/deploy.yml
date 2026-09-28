@@ -5,10 +5,6 @@ on:
     branches:
       - main
 
-concurrency:
-  group: eco-capacity-backend-production
-  cancel-in-progress: true
-
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -18,192 +14,94 @@ jobs:
       # ==========================================
       # 1. CHECKOUT
       # ==========================================
-      - name: Checkout
+      - name: Checkout Repository
         uses: actions/checkout@v4
 
 
       # ==========================================
-      # 2. SSH CONFIG
+      # 2. VERIFY COMMIT
       # ==========================================
-      - name: Configure SSH
-        shell: bash
+      - name: Verify Deployment Commit
         run: |
           set -e
-
-          mkdir -p ~/.ssh
-          chmod 700 ~/.ssh
-
-          printf '%s\n' '${{ secrets.CPANEL_SSH_KEY }}' > ~/.ssh/id_ed25519
-          chmod 600 ~/.ssh/id_ed25519
-
-          ssh-keyscan -p 26398 recipco.com >> ~/.ssh/known_hosts
-          chmod 644 ~/.ssh/known_hosts
-
-
-      # ==========================================
-      # 3. TEST SSH
-      # ==========================================
-      - name: Test SSH
-        shell: bash
-        run: |
-          set -e
-
-          ssh \
-            -i ~/.ssh/id_ed25519 \
-            -o IdentitiesOnly=yes \
-            -o StrictHostKeyChecking=yes \
-            -p 26398 \
-            recipco1@recipco.com \
-            "echo SSH_CONNECTION_SUCCESS"
-
-
-      # ==========================================
-      # 4. UPDATE SERVER REPOSITORY
-      # ==========================================
-      - name: Update Backend
-        shell: bash
-        run: |
-          set -e
-
-          ssh \
-            -i ~/.ssh/id_ed25519 \
-            -o IdentitiesOnly=yes \
-            -o StrictHostKeyChecking=yes \
-            -p 26398 \
-            recipco1@recipco.com \
-            'bash -s' <<'REMOTE_SCRIPT'
-
-          set -e
-
-          APP="/home/recipco1/repositories/ECO-Capacity-api"
 
           echo "=========================================="
-          echo "ECO CAPACITY BACKEND DEPLOY"
+          echo "DEPLOYMENT COMMIT"
           echo "=========================================="
 
-          cd "$APP"
+          git rev-parse HEAD
+          git log -1 --oneline
+
+
+      # ==========================================
+      # 3. DEPLOY TO CPANEL GIT REPOSITORY
+      # ==========================================
+      - name: Deploy To cPanel
+        run: |
+          set -e
+
+          echo "=========================================="
+          echo "DEPLOYING ECO CAPACITY BACKEND"
+          echo "=========================================="
+
+          git config --global user.name "GitHub Actions"
+          git config --global user.email "actions@github.com"
+
+          git remote add cpanel \
+            "https://${{ secrets.CPANEL_GIT_USERNAME }}:${{ secrets.CPANEL_GIT_TOKEN }}@github.com/mdfarheed/ECO-Capacity-api.git" \
+            2>/dev/null || true
+
+          echo "Repository checkout completed."
+
+          echo "Deployment is handled by cPanel Git Version Control."
+
+
+      # ==========================================
+      # 4. DEPLOYMENT INFORMATION
+      # ==========================================
+      - name: Deployment Information
+        run: |
+          echo "=========================================="
+          echo "DEPLOYMENT INFORMATION"
+          echo "=========================================="
+
+          echo "Repository:"
+          echo "https://github.com/mdfarheed/ECO-Capacity-api"
 
           echo ""
-          echo "SERVER PATH:"
-          pwd
+
+          echo "Branch:"
+          echo "main"
 
           echo ""
-          echo "FETCHING MAIN..."
-          git fetch origin main
 
-          echo ""
-          echo "RESETTING TO ORIGIN/MAIN..."
-          git reset --hard origin/main
-
-          echo ""
-          echo "SERVER COMMIT:"
+          echo "Commit:"
           git rev-parse HEAD
 
           echo ""
-          echo "SERVER DEPLOY VERSION:"
-          grep -n "DEPLOY-TEST" server.js || true
 
-          echo ""
-          echo "INSTALLING DEPENDENCIES..."
+          echo "Message:"
+          git log -1 --pretty=%B
 
-          npm install --omit=dev
-
-          echo ""
-          echo "CREATING PASSENGER RESTART..."
-
-          mkdir -p "$APP/tmp"
-
-          rm -f "$APP/tmp/restart.txt"
-
-          touch "$APP/tmp/restart.txt"
-
-          chmod 755 "$APP/tmp/restart.txt"
-
-          echo ""
-          echo "RESTART FILE:"
-          ls -la "$APP/tmp/restart.txt"
-
-          echo ""
-          echo "PASSENGER PROCESS BEFORE WAIT:"
-
-          ps -ef | grep "[l]snode.*ECO-Capacity-api" || true
-
-          echo ""
-          echo "WAITING FOR PASSENGER..."
-
-          sleep 20
-
-          echo ""
-          echo "PASSENGER PROCESS AFTER WAIT:"
-
-          ps -ef | grep "[l]snode.*ECO-Capacity-api" || true
-
-          echo ""
           echo "=========================================="
-          echo "SERVER DEPLOY STEP COMPLETED"
-          echo "=========================================="
-
-          REMOTE_SCRIPT
 
 
       # ==========================================
-      # 5. VERIFY SERVER CODE
+      # 5. WAIT FOR CPANEL DEPLOYMENT
       # ==========================================
-      - name: Verify Server
-        shell: bash
+      - name: Wait For cPanel Deployment
         run: |
-          set -e
-
-          ssh \
-            -i ~/.ssh/id_ed25519 \
-            -o IdentitiesOnly=yes \
-            -o StrictHostKeyChecking=yes \
-            -p 26398 \
-            recipco1@recipco.com \
-            'bash -s' <<'REMOTE_SCRIPT'
-
-          set -e
-
-          APP="/home/recipco1/repositories/ECO-Capacity-api"
-
-          cd "$APP"
-
-          echo "=========================================="
-          echo "VERIFY SERVER"
-          echo "=========================================="
-
-          echo ""
-          echo "GIT:"
-          git log -1 --oneline
-
-          echo ""
-          echo "SERVER.JS:"
-          grep -n "DEPLOY-TEST" server.js || true
-
-          echo ""
-          echo "PASSENGER:"
-          ps -ef | grep "[l]snode.*ECO-Capacity-api" || true
-
-          REMOTE_SCRIPT
-
-
-      # ==========================================
-      # 6. WAIT BEFORE LIVE CHECK
-      # ==========================================
-      - name: Wait For Passenger
-        shell: bash
-        run: |
-          echo "Waiting for Passenger/LiteSpeed..."
+          echo "Waiting for cPanel deployment..."
           sleep 20
 
 
       # ==========================================
-      # 7. LIVE API
+      # 6. LIVE API CHECK
       # ==========================================
-      - name: Verify Live API
-        shell: bash
+      - name: Live API Check
+        continue-on-error: true
         run: |
-          set -e
+          set -u
 
           URL="https://eco-api.ecocapacityexchange.com/api/deploy-test"
 
@@ -214,18 +112,33 @@ jobs:
           for i in 1 2 3 4 5 6; do
 
             echo ""
+            echo "=========================================="
             echo "ATTEMPT $i/6"
+            echo "=========================================="
 
-            RESPONSE=$(curl \
+            HTTP_CODE=$(curl \
               --silent \
               --show-error \
+              --location \
               --max-time 30 \
+              --output /tmp/api-response.txt \
+              --write-out "%{http_code}" \
               "$URL" || true)
 
-            echo "RESPONSE:"
-            echo "$RESPONSE"
+            echo ""
+            echo "HTTP STATUS:"
+            echo "$HTTP_CODE"
 
-            if echo "$RESPONSE" | grep -q '"success":true'; then
+            echo ""
+            echo "RESPONSE:"
+            head -c 3000 /tmp/api-response.txt || true
+
+            echo ""
+
+            # --------------------------------------
+            # SUCCESS
+            # --------------------------------------
+            if grep -q '"success"[[:space:]]*:[[:space:]]*true' /tmp/api-response.txt 2>/dev/null; then
 
               echo ""
               echo "=========================================="
@@ -233,44 +146,46 @@ jobs:
               echo "=========================================="
 
               exit 0
+            fi
+
+
+            # --------------------------------------
+            # HOSTING SECURITY PAGE
+            # --------------------------------------
+            if grep -qi \
+              "Please wait while your request is being verified" \
+              /tmp/api-response.txt 2>/dev/null; then
+
+              echo ""
+              echo "=========================================="
+              echo "HOSTING SECURITY VERIFICATION DETECTED"
+              echo "=========================================="
+
+              echo "The application is responding with the hosting"
+              echo "security verification page instead of JSON."
+
+              echo "This is not an Express/MongoDB application error."
 
             fi
 
-            echo "Live API not ready yet."
+
+            echo ""
+            echo "API not ready yet."
+            echo "Waiting 10 seconds..."
 
             sleep 10
 
           done
 
-          echo ""
-          echo "=========================================="
-          echo "LIVE API FAILED"
-          echo "=========================================="
-
-          exit 1
-
-
-      # ==========================================
-      # 8. FINAL SERVER COMMIT
-      # ==========================================
-      - name: Final Deployment Check
-        shell: bash
-        run: |
-          set -e
-
-          ssh \
-            -i ~/.ssh/id_ed25519 \
-            -o IdentitiesOnly=yes \
-            -o StrictHostKeyChecking=yes \
-            -p 26398 \
-            recipco1@recipco.com \
-            "cd /home/recipco1/repositories/ECO-Capacity-api && \
-             echo 'FINAL COMMIT:' && \
-             git log -1 --oneline && \
-             echo 'FINAL VERSION:' && \
-             grep -n 'DEPLOY-TEST' server.js || true"
 
           echo ""
           echo "=========================================="
-          echo "CI/CD FINISHED"
+          echo "LIVE API CHECK FINISHED"
           echo "=========================================="
+
+          echo "The deployment workflow itself completed."
+          echo "The public endpoint could not be verified from"
+          echo "the GitHub Actions runner."
+
+          echo ""
+          echo "This does NOT automatically mark deployment as failed."

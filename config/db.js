@@ -2,19 +2,37 @@ const mongoose = require('mongoose');
 
 const connectDB = async () => {
   try {
-    if (!process.env.MONGO_URI) {
+    let mongoURI = process.env.MONGO_URI;
+
+    if (!mongoURI) {
       throw new Error('MONGO_URI is not defined');
+    }
+
+    // Protect against incorrectly configured environment variable
+    if (mongoURI.startsWith('MONGO_URI=')) {
+      mongoURI = mongoURI.replace(/^MONGO_URI=/, '');
+    }
+
+    mongoURI = mongoURI.trim();
+
+    if (
+      !mongoURI.startsWith('mongodb://') &&
+      !mongoURI.startsWith('mongodb+srv://')
+    ) {
+      throw new Error(
+        'Invalid MONGO_URI. Expected mongodb:// or mongodb+srv://'
+      );
     }
 
     mongoose.set('strictQuery', true);
 
-    await mongoose.connect(process.env.MONGO_URI, {
+    await mongoose.connect(mongoURI, {
       readPreference: 'primary',
       retryWrites: true,
       w: 'majority',
       serverSelectionTimeoutMS: 15000,
       connectTimeoutMS: 15000,
-      socketTimeoutMS: 45000,
+      socketTimeoutMS: 45000
     });
 
     console.log('MongoDB connected ✅');
@@ -34,7 +52,11 @@ const connectDB = async () => {
     });
 
   } catch (error) {
-    console.error('MongoDB connection failed ❌:', error.message);
+    console.error(
+      'MongoDB connection failed ❌:',
+      error.message
+    );
+
     process.exit(1);
   }
 };
