@@ -79,7 +79,7 @@ app.get('/api/deploy-test', (req, res) => {
     success: true,
     message: 'ECO Capacity Backend deployed successfully 🚀',
     deployment: 'GitHub Actions + cPanel Passenger',
-    version: 'DEPLOY-TEST-008',
+    version: 'DEPLOY-TEST-009',
     timestamp: new Date().toISOString()
   });
 });
