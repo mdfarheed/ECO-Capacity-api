@@ -12,15 +12,23 @@ jobs:
     steps:
 
       # ==========================================
-      # DEPLOY BACKEND TO CPANEL
+      # CHECKOUT
       # ==========================================
-      - name: Deploy ECO Capacity Backend
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      # ==========================================
+      # DEPLOY DIRECTLY TO CPANEL
+      # ==========================================
+      - name: Deploy Backend to cPanel
         uses: appleboy/ssh-action@master
         with:
           host: ${{ secrets.CPANEL_HOST }}
           username: ${{ secrets.CPANEL_USERNAME }}
           port: ${{ secrets.CPANEL_PORT }}
           key: ${{ secrets.CPANEL_SSH_KEY }}
+          timeout: 60s
+          command_timeout: 20m
 
           script: |
             set -e
@@ -29,105 +37,108 @@ jobs:
             echo "ECO CAPACITY BACKEND DEPLOYMENT"
             echo "======================================"
 
-            # --------------------------------------
-            # NODE PATH
-            # --------------------------------------
             export NODEPATH=/home/recipco1/.nvm/versions/node/v20.20.2/bin
             export PATH=$NODEPATH:$PATH
 
-            echo "Node:"
-            node -v
-
-            echo "NPM:"
-            npm -v
-
-            # --------------------------------------
-            # PATHS
-            # --------------------------------------
-            REPOPATH=/home/recipco1/repositories/eco-capacity-git
-            DEPLOYPATH=/home/recipco1/repositories/ECO-Capacity-api
-
-            echo "REPOPATH=$REPOPATH"
-            echo "DEPLOYPATH=$DEPLOYPATH"
-
-            # --------------------------------------
-            # GO TO CPANEL GIT REPOSITORY
-            # --------------------------------------
-            cd $REPOPATH
+            REPOPATH=/home/recipco1/repositories/ECO-Capacity-api
 
             echo "======================================"
-            echo "PULLING LATEST GITHUB CODE"
+            echo "SERVER"
+            echo "======================================"
+
+            whoami
+            hostname
+
+            echo "======================================"
+            echo "DEPLOY PATH"
+            echo "======================================"
+
+            cd $REPOPATH
+
+            echo "Current directory:"
+            pwd
+
+            echo "======================================"
+            echo "FETCH LATEST GITHUB CODE"
             echo "======================================"
 
             git fetch origin main
+
+            echo "Remote commit:"
+            git rev-parse origin/main
+
+            echo "======================================"
+            echo "RESET LIVE APP TO LATEST COMMIT"
+            echo "======================================"
+
             git reset --hard origin/main
 
-            echo "Latest commit:"
-            git log -1 --oneline
-
-            echo "Version in repository:"
-            grep -n "DEPLOY-TEST" server.js || true
-
-            # --------------------------------------
-            # DEPLOY FILES
-            # --------------------------------------
             echo "======================================"
-            echo "COPYING BACKEND FILES"
+            echo "REMOVE OLD UNTRACKED FILES"
             echo "======================================"
 
-            /bin/cp -f server.js $DEPLOYPATH/
-            /bin/cp -f package.json $DEPLOYPATH/
-            /bin/cp -f package-lock.json $DEPLOYPATH/
+            git clean -fd \
+              -e .env \
+              -e node_modules \
+              -e node_modules_backup \
+              -e tmp
 
-            # --------------------------------------
-            # COPY BACKEND DIRECTORIES
-            # --------------------------------------
-            /bin/cp -R config $DEPLOYPATH/
-            /bin/cp -R controllers $DEPLOYPATH/
-            /bin/cp -R middleware $DEPLOYPATH/
-            /bin/cp -R models $DEPLOYPATH/
-            /bin/cp -R routesutils $DEPLOYPATH/
-
-            # --------------------------------------
-            # OPTIONAL FILES
-            # --------------------------------------
-            if [ -f .htaccess ]; then
-              /bin/cp -f .htaccess $DEPLOYPATH/
-            fi
-
-            # --------------------------------------
-            # INSTALL DEPENDENCIES
-            # --------------------------------------
             echo "======================================"
-            echo "INSTALLING BACKEND DEPENDENCIES"
+            echo "INSTALL DEPENDENCIES"
             echo "======================================"
-
-            cd $DEPLOYPATH
 
             $NODEPATH/npm ci --omit=dev
 
-            # --------------------------------------
-            # PASSENGER RESTART
-            # --------------------------------------
             echo "======================================"
-            echo "RESTARTING PASSENGER"
+            echo "VERIFY DEPLOYED COMMIT"
             echo "======================================"
 
-            /bin/mkdir -p $DEPLOYPATH/tmp
+            git log -1 --oneline
 
-            /bin/rm -f $DEPLOYPATH/tmp/restart.txt
+            echo "VERSION:"
+            grep -n "DEPLOY-TEST" server.js || true
 
-            /bin/touch $DEPLOYPATH/tmp/restart.txt
-
-            # --------------------------------------
-            # VERIFY FILE
-            # --------------------------------------
             echo "======================================"
-            echo "VERIFYING DEPLOYED FILE"
+            echo "PASSENGER RESTART"
             echo "======================================"
 
-            grep -n "DEPLOY-TEST" $DEPLOYPATH/server.js
+            PID=$(ps -ef | awk '/[l]snode.*ECO-Capacity-api/ {print $2; exit}')
 
+            if [ -n "$PID" ]; then
+              echo "Stopping old Passenger process: $PID"
+              kill "$PID" || true
+              sleep 5
+            else
+              echo "No existing Passenger process found."
+            fi
+
+            echo "Creating Passenger restart trigger..."
+
+            mkdir -p "$REPOPATH/tmp"
+            rm -f "$REPOPATH/tmp/restart.txt"
+            touch "$REPOPATH/tmp/restart.txt"
+
+            echo "======================================"
+            echo "WAITING FOR PASSENGER"
+            echo "======================================"
+
+            sleep 10
+
+            echo "======================================"
+            echo "NEW PASSENGER PROCESS"
+            echo "======================================"
+
+            ps -ef | grep "[l]snode.*ECO-Capacity-api" || true
+
+            echo "======================================"
+            echo "LIVE API CHECK"
+            echo "======================================"
+
+            curl -sS \
+              --max-time 30 \
+              https://eco-api.ecocapacityexchange.com/api/deploy-test
+
+            echo
             echo "======================================"
             echo "ECO CAPACITY BACKEND DEPLOYED"
             echo "======================================"
