@@ -7,10 +7,4 @@ deployment:
 
     - /bin/touch $DEPLOYPATH/tmp/restart.txt
 
-    - /bin/chmod 755 $DEPLOYPATH
-
-    - /bin/chmod 755 $DEPLOYPATH/tmp
-
-    - /bin/echo "Passenger restart triggered"
-
-    - /bin/sleep 5
+    - /bin/chmod 755 $DEPLOYPATH/tmp/restart.txt
